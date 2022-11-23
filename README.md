@@ -1,4 +1,5 @@
 # Transformer-monitoring-system
+Client: Mary  
 Monitors parameters of a power transformer, logs the data, and uploads to Google sheets.   
 
 ## Credits  

@@ -2,27 +2,28 @@
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <WiFiManager.h>
-
-//RTOS
-#if CONFIG_FREERTOS_UNICORE
-#define ARDUINO_RUNNING_CORE  0
-#else
-#define ARDUINO_RUNNING_CORE  1
-#endif
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h> //Version 1.1.2
+#include "ThingSpeak.h" //Version 2.0.1
 
 //Defines
 //Maximum number of characters for IFTTT details
 #define SIZE_EVENT_NAME        20
 #define SIZE_IFTTT_KEY         50
+//Maximum number of characters for ThingSpeak credentials
+#define SIZE_CHANNEL_ID        30
+#define SIZE_API_KEY           50
 
 //Shared resources
 //Define textboxes for IFTTT event name and key  
-WiFiManagerParameter eventName("event","Event name","",SIZE_EVENT_NAME);
-WiFiManagerParameter iftttKey("key","IFTTT key","",SIZE_IFTTT_KEY);
+WiFiManagerParameter eventName("0","Event name","",SIZE_EVENT_NAME);
+WiFiManagerParameter iftttKey("1","IFTTT key","",SIZE_IFTTT_KEY);
+WiFiManagerParameter channelId("2","ThingSpeak channel ID","",SIZE_CHANNEL_ID);
+WiFiManagerParameter apiKey("3","ThingSpeak API key","",SIZE_API_KEY);
 Preferences preferences; //for accessing ESP32 flash memory
 
-//String eventName = "Power data";
-//String key = "c8wyfZGxnyQjACiOYVsSI6";
+//Task handle(s)
+TaskHandle_t wifiTaskHandle;
 
 /**
  * @brief Make an HTTP GET request to the specified server
@@ -45,8 +46,9 @@ static void HttpGetRequest(const char* serverName)
 }
 
 /**
- * @brief Store new data (IFTTT credentials) to specified location  
- * in ESP32's flash memory if the new credentials are different from the previous.  
+ * @brief Store new data (e.g. IFTTT and ThingSpeak credentials) to specified 
+ * location in ESP32's flash memory if the new credentials are different from 
+ * the previous.  
 */
 static void StoreNewFlashData(const char* flashLoc,const char* newData,
                               const char* oldData,uint8_t dataSize)
@@ -63,8 +65,8 @@ void setup()
   Serial.begin(115200);
   preferences.begin("T-Mon",false); //T-Mon : Transformer monitor
   //Create tasks
-  xTaskCreatePinnedToCore(WiFiManagementTask,"",7000,NULL,1,NULL,ARDUINO_RUNNING_CORE);
-  xTaskCreatePinnedToCore(GoogleSheetTask,"",8000,NULL,1,NULL,ARDUINO_RUNNING_CORE);  
+  xTaskCreatePinnedToCore(WiFiManagementTask,"",7000,NULL,1,&wifiTaskHandle,1);
+  xTaskCreatePinnedToCore(ApplicationTask,"",25000,NULL,1,NULL,1);
 }
 
 void loop() 
@@ -83,6 +85,8 @@ void WiFiManagementTask(void* pvParameters)
   WiFi.mode(WIFI_STA);  
   wm.addParameter(&eventName);
   wm.addParameter(&iftttKey);
+  wm.addParameter(&channelId);
+  wm.addParameter(&apiKey);  
   wm.setConfigPortalBlocking(false);
   wm.setSaveParamsCallback(WiFiManagerCallback);   
   //Auto-connect to previous network if available.
@@ -131,44 +135,99 @@ void WiFiManagementTask(void* pvParameters)
 }
 
 /**
- * @brief Uploads PZEM-004T module's data to Google sheets via 
- * HTTP requests. IFTTT serves as an intermediary between  
- * the ESP32 and Google sheets.  
+ * @brief Gets PZEM-004T data, and displays on an LCD.
+ * Uploads PZEM-004T module's data to Google sheets and ThingSpeak
+ * via HTTP requests. IFTTT serves as an intermediary 
+ * between the ESP32 and Google sheets.  
 */
-void GoogleSheetTask(void* pvParameters)
+void ApplicationTask(void* pvParameters)
 {
+  static WiFiClient wifiClient;
+  ThingSpeak.begin(wifiClient);
+    
+  static LiquidCrystal_I2C lcd(0x27,16,2);
+  //LCD init and startup message
+  lcd.init();
+  lcd.backlight();
+  lcd.print("Energy monitor");
+  vTaskDelay(pdMS_TO_TICKS(1500));
+  lcd.clear();  
+
   char prevEventName[SIZE_EVENT_NAME] = {0};
-  char prevKey[SIZE_IFTTT_KEY] = {0};
+  char prevIftttKey[SIZE_IFTTT_KEY] = {0};
+  char prevChannelId[SIZE_CHANNEL_ID] = {0};
+  char prevApiKey[SIZE_API_KEY] = {0};
+    
   uint32_t prevTime = millis();
+
   while(1)
   {
-    if(WiFi.status() == WL_CONNECTED && ((millis() - prevTime) >= 10000))
+    if(WiFi.status() == WL_CONNECTED && ((millis() - prevTime) >= 20000))
     {
-      preferences.getBytes("event",prevEventName,SIZE_EVENT_NAME);
-      preferences.getBytes("key",prevKey,SIZE_IFTTT_KEY);  
-            
+      preferences.getBytes("0",prevEventName,SIZE_EVENT_NAME);
+      preferences.getBytes("1",prevIftttKey,SIZE_IFTTT_KEY);  
+      preferences.getBytes("2",prevChannelId,SIZE_CHANNEL_ID);
+      preferences.getBytes("3",prevApiKey,SIZE_API_KEY); 
+      /*TO-DO: ADD CODE TO GET PZEM DATA*/
+
+      /*TO-DO: ADD CODE TO DISPLAY DATA ON LCD*/
+
+      //Encode PZEM data to be sent to ThingSpeak
+      ThingSpeak.setField(1,112); //replace 2nd argument with PZEM data
+      ThingSpeak.setField(2,225); //replace 2nd argument with PZEM data
+      ThingSpeak.setField(3,777); //replace 2nd argument with PZEM data
+      //Convert channel ID from string to integer
+      String idString = String(prevChannelId);
+      uint32_t idInteger = idString.toInt();
+      
+      //Critical section [Send data to ThingSpeak]
+      vTaskSuspend(wifiTaskHandle);
+      int httpCode = ThingSpeak.writeFields(idInteger,prevApiKey); 
+      vTaskResume(wifiTaskHandle);
+      
+      if(httpCode == HTTP_CODE_OK)
+      {
+        Serial.println("THINGSPEAK: HTTP request successful");
+      }
+      else
+      {
+        Serial.println("THINGSPEAK: HTTP error");
+      }
+           
       String iftttServerPath = "http://maker.ifttt.com/trigger/" + String(prevEventName) + 
-                         "/with/key/" + String(prevKey) + "?value1=" + String(112) 
+                         "/with/key/" + String(prevIftttKey) + "?value1=" + String(112) 
                          + "&value2="+String(225) +"&value3=" + String(777); 
+      //Critical section [Send PZEM data to IFTTT (IFTTT sends the data to Google Sheets)]                   
+      vTaskSuspend(wifiTaskHandle);                                      
       HttpGetRequest(iftttServerPath.c_str());
+      vTaskResume(wifiTaskHandle);
+      
       prevTime = millis(); 
     }
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
 /*
  * @brief Callback function that is called whenever WiFi
- * manager parameters are received (in this case, IFTTT
- * details)
+ * manager parameters are received (in this case, IFTTT and ThingSpeak
+ * credentials)
 */
 void WiFiManagerCallback(void) 
 {
   char prevEventName[SIZE_EVENT_NAME] = {0};
-  char prevKey[SIZE_IFTTT_KEY] = {0};
-  preferences.getBytes("event",prevEventName,SIZE_EVENT_NAME);
-  preferences.getBytes("key",prevKey,SIZE_IFTTT_KEY);  
-  //Store IFTTT credentials in flash if the new ones are not the same as the old.  
-  StoreNewFlashData("event",eventName.getValue(),prevEventName,SIZE_EVENT_NAME);
-  StoreNewFlashData("key",iftttKey.getValue(),prevKey,SIZE_IFTTT_KEY);
+  char prevIftttKey[SIZE_IFTTT_KEY] = {0};
+  char prevChannelId[SIZE_CHANNEL_ID] = {0};
+  char prevApiKey[SIZE_API_KEY] = {0};
+  //Get previously stored data  
+  preferences.getBytes("0",prevEventName,SIZE_EVENT_NAME);
+  preferences.getBytes("1",prevIftttKey,SIZE_IFTTT_KEY);  
+  preferences.getBytes("2",prevChannelId,SIZE_CHANNEL_ID);
+  preferences.getBytes("3",prevApiKey,SIZE_API_KEY);   
+  //Store data in flash if the new ones are not the same as the old.  
+  StoreNewFlashData("0",eventName.getValue(),prevEventName,SIZE_EVENT_NAME);
+  StoreNewFlashData("1",iftttKey.getValue(),prevIftttKey,SIZE_IFTTT_KEY);
+  StoreNewFlashData("2",channelId.getValue(),prevChannelId,SIZE_CHANNEL_ID);
+  StoreNewFlashData("3",apiKey.getValue(),prevApiKey,SIZE_API_KEY);  
 }
 

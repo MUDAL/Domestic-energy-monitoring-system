@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <WiFiManager.h>
 #include <Wire.h>
+#include <PZEM004Tv30.h>
 #include <LiquidCrystal_I2C.h> //Version 1.1.2
 #include "ThingSpeak.h" //Version 2.0.1
 
@@ -22,8 +23,14 @@ WiFiManagerParameter channelId("2","ThingSpeak channel ID","",SIZE_CHANNEL_ID);
 WiFiManagerParameter apiKey("3","ThingSpeak API key","",SIZE_API_KEY);
 Preferences preferences; //for accessing ESP32 flash memory
 
+float pzemVoltage = 0; //in volts
+float pzemCurrent = 0; //in amps
+float pzemPower = 0; //in watts
+float pzemEnergy = 0; //in kWh
+
 //Task handle(s)
 TaskHandle_t wifiTaskHandle;
+TaskHandle_t lcdTaskHandle;
 
 /**
  * @brief Make an HTTP GET request to the specified server
@@ -66,7 +73,8 @@ void setup()
   preferences.begin("T-Mon",false); //T-Mon : Transformer monitor
   //Create tasks
   xTaskCreatePinnedToCore(WiFiManagementTask,"",7000,NULL,1,&wifiTaskHandle,1);
-  xTaskCreatePinnedToCore(ApplicationTask,"",25000,NULL,1,NULL,1);
+  xTaskCreatePinnedToCore(ApplicationTask,"",50000,NULL,1,NULL,1);
+  xTaskCreatePinnedToCore(LcdTask,"",8000,NULL,1,&lcdTaskHandle,1);
 }
 
 void loop() 
@@ -135,7 +143,7 @@ void WiFiManagementTask(void* pvParameters)
 }
 
 /**
- * @brief Gets PZEM-004T data, and displays on an LCD.
+ * @brief Gets PZEM-004T data.
  * Uploads PZEM-004T module's data to Google sheets and ThingSpeak
  * via HTTP requests. IFTTT serves as an intermediary 
  * between the ESP32 and Google sheets.  
@@ -143,16 +151,10 @@ void WiFiManagementTask(void* pvParameters)
 void ApplicationTask(void* pvParameters)
 {
   static WiFiClient wifiClient;
+  static PZEM004Tv30 pzem(&Serial2,16,17);
   ThingSpeak.begin(wifiClient);
-    
-  static LiquidCrystal_I2C lcd(0x27,16,2);
-  //LCD init and startup message
-  lcd.init();
-  lcd.backlight();
-  lcd.print("Energy monitor");
-  vTaskDelay(pdMS_TO_TICKS(1500));
-  lcd.clear();  
-
+  
+  //Previously stored data (in ESP32's flash)
   char prevEventName[SIZE_EVENT_NAME] = {0};
   char prevIftttKey[SIZE_IFTTT_KEY] = {0};
   char prevChannelId[SIZE_CHANNEL_ID] = {0};
@@ -168,23 +170,44 @@ void ApplicationTask(void* pvParameters)
       preferences.getBytes("1",prevIftttKey,SIZE_IFTTT_KEY);  
       preferences.getBytes("2",prevChannelId,SIZE_CHANNEL_ID);
       preferences.getBytes("3",prevApiKey,SIZE_API_KEY); 
-      /*TO-DO: ADD CODE TO GET PZEM DATA*/
+      
+      //Critical section [Get data from PZEM module]
+      vTaskSuspend(wifiTaskHandle); 
+      vTaskSuspend(lcdTaskHandle); 
+      pzemVoltage = pzem.voltage(); //in volts
+      pzemCurrent = pzem.current(); //in amps
+      pzemPower = pzem.power(); //in watts
+      pzemEnergy = pzem.energy(); //in kWh
+      vTaskResume(wifiTaskHandle); 
+      vTaskResume(lcdTaskHandle);
 
-      /*TO-DO: ADD CODE TO DISPLAY DATA ON LCD*/
-
+      //Debug PZEM
+      Serial.print("Voltage: ");
+      Serial.println(pzemVoltage);
+      Serial.print("Current: ");
+      Serial.println(pzemCurrent);
+      Serial.print("Power: ");
+      Serial.println(pzemPower);
+      Serial.print("Energy: ");
+      Serial.println(pzemEnergy,3); //3dp
+      
       //Encode PZEM data to be sent to ThingSpeak
-      ThingSpeak.setField(1,112); //replace 2nd argument with PZEM data
-      ThingSpeak.setField(2,225); //replace 2nd argument with PZEM data
-      ThingSpeak.setField(3,777); //replace 2nd argument with PZEM data
+      ThingSpeak.setField(1,pzemVoltage);
+      ThingSpeak.setField(2,pzemCurrent); 
+      ThingSpeak.setField(3,pzemPower); 
+      ThingSpeak.setField(4,pzemEnergy);
+      
       //Convert channel ID from string to integer
       String idString = String(prevChannelId);
       uint32_t idInteger = idString.toInt();
-      
       //Critical section [Send data to ThingSpeak]
-      vTaskSuspend(wifiTaskHandle);
+      vTaskSuspend(wifiTaskHandle); 
+      vTaskSuspend(lcdTaskHandle); 
       int httpCode = ThingSpeak.writeFields(idInteger,prevApiKey); 
       vTaskResume(wifiTaskHandle);
+      vTaskResume(lcdTaskHandle);
       
+      //Check HTTP response from ThingSpeak
       if(httpCode == HTTP_CODE_OK)
       {
         Serial.println("THINGSPEAK: HTTP request successful");
@@ -195,16 +218,54 @@ void ApplicationTask(void* pvParameters)
       }
            
       String iftttServerPath = "http://maker.ifttt.com/trigger/" + String(prevEventName) + 
-                         "/with/key/" + String(prevIftttKey) + "?value1=" + String(112) 
-                         + "&value2="+String(225) +"&value3=" + String(777); 
+                         "/with/key/" + String(prevIftttKey) + "?value1=" + String(pzemVoltage) 
+                         + "&value2=" + String(pzemCurrent) +"&value3=" + String(pzemPower)
+                         + "&value4=" + String(pzemEnergy,3); //3dp for energy 
       //Critical section [Send PZEM data to IFTTT (IFTTT sends the data to Google Sheets)]                   
-      vTaskSuspend(wifiTaskHandle);                                      
+      vTaskSuspend(wifiTaskHandle); 
+      vTaskSuspend(lcdTaskHandle);                                     
       HttpGetRequest(iftttServerPath.c_str());
       vTaskResume(wifiTaskHandle);
+      vTaskResume(lcdTaskHandle);
       
       prevTime = millis(); 
     }
     vTaskDelay(pdMS_TO_TICKS(50));
+  }
+}
+
+/**
+ * @brief Displays PZEM-004T's readings on the LCD
+*/
+void LcdTask(void* pvParameters)
+{
+  static LiquidCrystal_I2C lcd(0x27,16,2); 
+  //LCD init and startup message
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(1,0);
+  lcd.print("Energy Monitor");
+  vTaskDelay(pdMS_TO_TICKS(1500)); 
+  
+  while(1)
+  {
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Volts:");
+    lcd.print(pzemVoltage,2);
+    lcd.setCursor(0,1);
+    lcd.print("Amps:");
+    lcd.print(pzemCurrent,2);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Watts:");
+    lcd.print(pzemPower,2);
+    lcd.setCursor(0,1);
+    lcd.print("kWh:");
+    lcd.print(pzemEnergy,3);
+    vTaskDelay(pdMS_TO_TICKS(2000));
   }
 }
 

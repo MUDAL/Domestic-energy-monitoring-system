@@ -1,0 +1,2 @@
+1. LCD: (SDA: 21, SCL: 22) 
+2. PZEM: (PZEM TX: 16, PZEM RX: 17)

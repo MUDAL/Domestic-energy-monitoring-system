@@ -72,7 +72,7 @@ static void StoreNewFlashData(const char* flashLoc,const char* newData,
   }
 }
 
-/*
+/**
  * @brief Appends data to a file stored in an SD card
  * @param path: path to the file to be written
  * @param message: data to be appended to the file
@@ -109,33 +109,27 @@ static void ResumePinnedTasks(void)
 
 void setup() 
 {
-  const uint8_t chipSelectPin = 5;
   setCpuFrequencyMhz(80);
   Serial.begin(115200);
   preferences.begin("T-Mon",false); //T-Mon : Transformer monitor 
   //SD: Uses SPI pins 23(MOSI),19(MISO),18(CLK) and 5(CS)
+  const uint8_t chipSelectPin = 5;
   pinMode(chipSelectPin,OUTPUT);
   digitalWrite(chipSelectPin,HIGH);
-  if(SD.begin(chipSelectPin))
-  {
-    Serial.println("SD Init: SUCCESS");
-  }
-  else
-  {
-    Serial.println("SD Init: FAILURE");
-  }  
+  Serial.print("SD Init: ");
+  Serial.println(SD.begin(chipSelectPin));
   //Create tasks
   xTaskCreatePinnedToCore(WiFiManagementTask,"",7000,NULL,1,&wifiTaskHandle,1);
   xTaskCreatePinnedToCore(ApplicationTask,"",60000,NULL,1,NULL,1);
   xTaskCreatePinnedToCore(LcdTask,"",8000,NULL,1,&lcdTaskHandle,1);
-  xTaskCreatePinnedToCore(LocalDataLogTask,"",15000,NULL,1,&dataLogTaskHandle,1);
+  xTaskCreatePinnedToCore(DataLoggingTask,"",15000,NULL,1,&dataLogTaskHandle,1);
 }
 
 void loop() 
 {
 }
 
-/*
+/**
  * @brief Manages WiFi configurations (STA and AP modes). Connects
  * to an existing/saved network if available, otherwise it acts as
  * an AP in order to receive new network credentials.
@@ -349,7 +343,7 @@ void LcdTask(void* pvParameters)
  * @brief Handles offline data logging.  
  * Stores data on an SD card (with timestamp).
 */
-void LocalDataLogTask(void* pvParameters)
+void DataLoggingTask(void* pvParameters)
 {
   static RTC_DS3231 rtc;
   rtc.begin();
@@ -362,13 +356,13 @@ void LocalDataLogTask(void* pvParameters)
       Serial.println("Logging to SD card");
       /*TO-DO: Add code to store PZEM data (with timestamp) on SD card*/
       String sdCardData = ""; //Concatenate time,date and PZEM readings
-      SD_AppendFile("/temp_file.txt",sdCardData.c_str());
+      SD_AppendFile("/project_file.txt",sdCardData.c_str());
       prevTime = millis();
     }
   }
 }
 
-/*
+/**
  * @brief Callback function that is called whenever WiFi
  * manager parameters are received (in this case, IFTTT and ThingSpeak
  * credentials)

@@ -11,6 +11,8 @@
 #include "SD.h"
 #include "SPI.h"
 
+//Note: 'Strings' aren't efficient but their use is fine for this application.
+
 //Defines
 //Maximum number of characters for IFTTT details
 #define SIZE_EVENT_NAME        20
@@ -122,7 +124,7 @@ void setup()
   xTaskCreatePinnedToCore(WiFiManagementTask,"",7000,NULL,1,&wifiTaskHandle,1);
   xTaskCreatePinnedToCore(ApplicationTask,"",60000,NULL,1,NULL,1);
   xTaskCreatePinnedToCore(LcdTask,"",8000,NULL,1,&lcdTaskHandle,1);
-  xTaskCreatePinnedToCore(DataLoggingTask,"",15000,NULL,1,&dataLogTaskHandle,1);
+  xTaskCreatePinnedToCore(DataLoggingTask,"",30000,NULL,1,&dataLogTaskHandle,1);
 }
 
 void loop() 
@@ -202,6 +204,7 @@ void ApplicationTask(void* pvParameters)
 {
   static WiFiClient wifiClient;
   static PZEM004Tv30 pzem(&Serial2,16,17);
+  static String iftttServerPath;
   ThingSpeak.begin(wifiClient);
   
   //Previously stored data (in ESP32's flash)
@@ -268,7 +271,7 @@ void ApplicationTask(void* pvParameters)
         Serial.println("THINGSPEAK: HTTP error");
       }
            
-      String iftttServerPath = "http://maker.ifttt.com/trigger/" + String(prevEventName) + 
+      iftttServerPath = "http://maker.ifttt.com/trigger/" + String(prevEventName) + 
                         "/with/key/" + String(prevIftttKey) + "?value1=" + String(pzemVoltage) 
                         + "&value2=" + String(pzemCurrent) +"&value3=" + String(pzemPower)
                         + "&value4=" + String(pzemEnergy,3); //3dp for energy 
@@ -341,11 +344,12 @@ void LcdTask(void* pvParameters)
 
 /**
  * @brief Handles offline data logging.  
- * Stores data on an SD card (with timestamp).
+ * Stores data on an SD card (with date and time).
 */
 void DataLoggingTask(void* pvParameters)
 {
   static RTC_DS3231 rtc;
+  static String sdCardData;
   rtc.begin();
   uint32_t prevTime = millis();
   
@@ -354,8 +358,14 @@ void DataLoggingTask(void* pvParameters)
     if((millis() - prevTime) >= 10000)
     {
       Serial.println("Logging to SD card");
-      /*TO-DO: Add code to store PZEM data (with timestamp) on SD card*/
-      String sdCardData = ""; //Concatenate time,date and PZEM readings
+      //Get current date and time and concatenate with PZEM readings
+      DateTime dateTime = rtc.now();
+      sdCardData = String(dateTime.day()) + "/" + String(dateTime.month()) + "/" + 
+                   String(dateTime.year()) + " " + String(dateTime.hour()) + ":" + 
+                   String(dateTime.minute()) + " ---> " + String(pzemVoltage) + "V, " + 
+                   String(pzemCurrent) + "A, " + String(pzemPower) + "W, " + 
+                   String(pzemEnergy) + "kWh\n"; 
+      
       SD_AppendFile("/project_file.txt",sdCardData.c_str());
       prevTime = millis();
     }

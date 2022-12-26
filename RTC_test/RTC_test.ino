@@ -12,7 +12,7 @@ void setup()
     Serial.println("Could not find RTC");
   }
   //Set date and time: year,month,day,hour,minute,second
-  rtc.adjust(DateTime(2022,12,25,23,36,0)); 
+  //rtc.adjust(DateTime(2022,12,26,13,26,0)); 
 }
 
 void loop() 

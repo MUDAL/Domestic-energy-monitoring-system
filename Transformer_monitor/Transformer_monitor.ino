@@ -43,22 +43,11 @@ TaskHandle_t dispLogTaskHandle;
 /**
  * @brief Make an HTTP GET request to the specified server
 */
-static void HttpGetRequest(const char* serverName) 
+static void HttpGetRequest(const char* serverName,int* httpResponseCode) 
 { 
   HTTPClient http;
   http.begin(serverName);
-  int httpResponseCode = http.GET();
-  if(httpResponseCode == HTTP_CODE_OK) 
-  {
-    isIftttOk = true;
-    Serial.println("IFTTT: HTTP request successful ");
-  } 
-  else 
-  {
-    isIftttOk = false;
-    Serial.print("IFTTT: HTTP error code = ");
-    Serial.println(httpResponseCode);
-  }
+  *httpResponseCode = http.GET();
   http.end();  
 }
 
@@ -120,7 +109,7 @@ static void NotifyUserIfConnIsOk(LiquidCrystal_I2C& lcd,char* server,bool* isSer
     lcd.clear();
     lcd.print(server);
     lcd.setCursor(0,1);
-    lcd.print("Success");
+    lcd.print("SUCCESS");
     *isServerOk = false;
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
@@ -215,7 +204,7 @@ void ApplicationTask(void* pvParameters)
   static WiFiClient wifiClient;
   static PZEM004Tv30 pzem(&Serial2,16,17);
   ThingSpeak.begin(wifiClient);
-  
+  int httpCode; //HTTP response code
   //Previously stored data (in ESP32's flash)
   char prevEventName[SIZE_EVENT_NAME] = {0};
   char prevIftttKey[SIZE_IFTTT_KEY] = {0};
@@ -267,7 +256,7 @@ void ApplicationTask(void* pvParameters)
       uint32_t idInteger = idString.toInt();
       //Critical section [Send data to ThingSpeak]
       SuspendPinnedTasks();
-      int httpCode = ThingSpeak.writeFields(idInteger,prevApiKey); 
+      httpCode = ThingSpeak.writeFields(idInteger,prevApiKey); 
       ResumePinnedTasks();
       
       //Check HTTP response from ThingSpeak
@@ -288,9 +277,20 @@ void ApplicationTask(void* pvParameters)
                                + "&value4=" + String(pzemEnergy,3); //3dp for energy 
       //Critical section [Send PZEM data to IFTTT (IFTTT sends the data to Google Sheets)]                   
       SuspendPinnedTasks();                                    
-      HttpGetRequest(iftttServerPath.c_str());
+      HttpGetRequest(iftttServerPath.c_str(),&httpCode);
+      //Check HTTP response from IFTTT
+      if(httpCode == HTTP_CODE_OK) 
+      {
+        isIftttOk = true;
+        Serial.println("IFTTT: HTTP request successful ");
+      } 
+      else 
+      {
+        isIftttOk = false;
+        Serial.print("IFTTT: HTTP error code = ");
+        Serial.println(httpCode);
+      }      
       ResumePinnedTasks();
-   
       prevConnectTime = millis(); 
     }
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -317,6 +317,7 @@ void DisplayAndLogTask(void* pvParameters)
 
   //SD Init
   //SD: Uses SPI pins 23(MOSI),19(MISO),18(CLK) and 5(CS)
+  bool sdInitialized = false;
   const uint8_t chipSelectPin = 5;
   pinMode(chipSelectPin,OUTPUT);
   digitalWrite(chipSelectPin,HIGH);
@@ -326,13 +327,14 @@ void DisplayAndLogTask(void* pvParameters)
     lcd.print("SD INIT: ");
     lcd.setCursor(0,1);
     lcd.print("SUCCESS");
+    sdInitialized = true;
   }
   else
   {
     Serial.println("SD INIT: FAILURE");
     lcd.print("SD INIT: ");
     lcd.setCursor(0,1);
-    lcd.print("FAILURE");    
+    lcd.print("FAILURE");  
   }
   vTaskDelay(pdMS_TO_TICKS(1500)); 
   lcd.clear();
@@ -347,8 +349,6 @@ void DisplayAndLogTask(void* pvParameters)
   
   while(1)
   {
-    NotifyUserIfConnIsOk(lcd,"ThingSpeak",&isThingSpeakOk);
-    NotifyUserIfConnIsOk(lcd,"IFTTT",&isIftttOk);
     //Display PZEM readings
     lcd.setCursor(0,0);
     switch(displayState)
@@ -381,8 +381,10 @@ void DisplayAndLogTask(void* pvParameters)
         }
         break;
     }
-    //Log data periodically
-    if((millis() - prevLogTime) >= 10000)
+    NotifyUserIfConnIsOk(lcd,"ThingSpeak",&isThingSpeakOk);
+    NotifyUserIfConnIsOk(lcd,"IFTTT",&isIftttOk);
+    //Log data to SD card periodically
+    if(sdInitialized && (millis() - prevLogTime) >= 40000)
     {
       Serial.println("Logging to SD card");
       //Get current date and time and concatenate with PZEM readings
@@ -391,10 +393,15 @@ void DisplayAndLogTask(void* pvParameters)
                           String(dateTime.year()) + " " + String(dateTime.hour()) + ":" + 
                           String(dateTime.minute()) + " ---> " + String(pzemVoltage) + "V, " + 
                           String(pzemCurrent) + "A, " + String(pzemPower) + "W, " + 
-                          String(pzemEnergy) + "kWh\n";
-                           
-      SD_AppendFile("/project_file.txt",sdCardData.c_str());      
+                          String(pzemEnergy) + "kWh\n";   
+      SD_AppendFile("/project_file.txt",sdCardData.c_str());
+      lcd.clear();
+      lcd.print("SD LOG: ");
+      lcd.setCursor(0,1);
+      lcd.print("SUCCESS");
       prevLogTime = millis();
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      lcd.clear();      
     }    
   }
 }

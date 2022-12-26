@@ -1,2 +1,4 @@
 1. LCD: (SDA: 21, SCL: 22) 
 2. PZEM: (PZEM TX: 16, PZEM RX: 17)
+3. RTC: (SDA: 21, SCL: 22)
+4. SD card module: (MOSI: 23, MISO: 19, CLK: 18, CS: 5)

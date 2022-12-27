@@ -79,26 +79,6 @@ static void SD_AppendFile(const char* path,const char* message)
 }
 
 /**
- * @brief Suspend all tasks (except application task) 
- * pinned to specified core.
-*/
-static void SuspendPinnedTasks(void)
-{
-  vTaskSuspend(wifiTaskHandle); 
-  vTaskSuspend(dispLogTaskHandle);  
-}
-
-/**
- * @brief Resume all tasks (except application task) 
- * pinned to specified core.
-*/
-static void ResumePinnedTasks(void)
-{
-  vTaskResume(wifiTaskHandle); 
-  vTaskResume(dispLogTaskHandle);
-}
-
-/**
  * @brief Notify the user if connection to a server (ThingSpeak or IFTTT) is
  * OK i.e. data was successfully sent to the server.
 */
@@ -213,21 +193,38 @@ void ApplicationTask(void* pvParameters)
   
   uint32_t prevPzemTime = millis();  
   uint32_t prevConnectTime = millis();
+  bool isWifiTaskSuspended = false;
  
   while(1)
   {
+    //Suspend WiFi Management task if the system is already.... 
+    //connected to a Wi-Fi network
+    if(WiFi.status() == WL_CONNECTED && !isWifiTaskSuspended)
+    {
+      Serial.println("WIFI TASK: SUSPENDED");
+      vTaskSuspend(wifiTaskHandle);
+      isWifiTaskSuspended = true;
+    }
+    else if(WiFi.status() != WL_CONNECTED && isWifiTaskSuspended)
+    {
+      Serial.println("WIFI TASK: RESUMED");
+      vTaskResume(wifiTaskHandle);
+      isWifiTaskSuspended = false;
+    }
+      
     //Critical section [Get data from PZEM module periodically]
     if((millis() - prevPzemTime) >= 1000)
     {
-      SuspendPinnedTasks();
+      vTaskSuspend(dispLogTaskHandle);
       pzemVoltage = pzem.voltage(); //in volts
       pzemCurrent = pzem.current(); //in amps
       pzemPower = pzem.power(); //in watts
-      pzemEnergy = pzem.energy(); //in kWh
-      ResumePinnedTasks();
+      pzemEnergy = pzem.energy(); //in kWh 
+      vTaskResume(dispLogTaskHandle);
       prevPzemTime = millis();
     }
-          
+
+    //Send data to the cloud [periodically]      
     if(WiFi.status() == WL_CONNECTED && ((millis() - prevConnectTime) >= 20000))
     {
       preferences.getBytes("0",prevEventName,SIZE_EVENT_NAME);
@@ -254,11 +251,8 @@ void ApplicationTask(void* pvParameters)
       //Convert channel ID from string to integer
       String idString = String(prevChannelId);
       uint32_t idInteger = idString.toInt();
-      //Critical section [Send data to ThingSpeak]
-      SuspendPinnedTasks();
+      //[Send data to ThingSpeak]
       httpCode = ThingSpeak.writeFields(idInteger,prevApiKey); 
-      ResumePinnedTasks();
-      
       //Check HTTP response from ThingSpeak
       if(httpCode == HTTP_CODE_OK)
       {
@@ -275,8 +269,7 @@ void ApplicationTask(void* pvParameters)
                                "/with/key/" + String(prevIftttKey) + "?value1=" + String(pzemVoltage) 
                                + "&value2=" + String(pzemCurrent) +"&value3=" + String(pzemPower)
                                + "&value4=" + String(pzemEnergy,3); //3dp for energy 
-      //Critical section [Send PZEM data to IFTTT (IFTTT sends the data to Google Sheets)]                   
-      SuspendPinnedTasks();                                    
+      //[Send PZEM data to IFTTT (IFTTT sends the data to Google Sheets)]                                                      
       HttpGetRequest(iftttServerPath.c_str(),&httpCode);
       //Check HTTP response from IFTTT
       if(httpCode == HTTP_CODE_OK) 
@@ -290,7 +283,6 @@ void ApplicationTask(void* pvParameters)
         Serial.print("IFTTT: HTTP error code = ");
         Serial.println(httpCode);
       }      
-      ResumePinnedTasks();
       prevConnectTime = millis(); 
     }
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -317,7 +309,6 @@ void DisplayAndLogTask(void* pvParameters)
 
   //SD Init
   //SD: Uses SPI pins 23(MOSI),19(MISO),18(CLK) and 5(CS)
-  bool sdInitialized = false;
   const uint8_t chipSelectPin = 5;
   pinMode(chipSelectPin,OUTPUT);
   digitalWrite(chipSelectPin,HIGH);
@@ -327,7 +318,6 @@ void DisplayAndLogTask(void* pvParameters)
     lcd.print("SD INIT: ");
     lcd.setCursor(0,1);
     lcd.print("SUCCESS");
-    sdInitialized = true;
   }
   else
   {
@@ -384,7 +374,7 @@ void DisplayAndLogTask(void* pvParameters)
     NotifyUserIfConnIsOk(lcd,"ThingSpeak",&isThingSpeakOk);
     NotifyUserIfConnIsOk(lcd,"IFTTT",&isIftttOk);
     //Log data to SD card periodically
-    if(sdInitialized && (millis() - prevLogTime) >= 40000)
+    if((millis() - prevLogTime) >= 40000)
     {
       Serial.println("Logging to SD card");
       //Get current date and time and concatenate with PZEM readings
@@ -396,9 +386,7 @@ void DisplayAndLogTask(void* pvParameters)
                           String(pzemEnergy) + "kWh\n";   
       SD_AppendFile("/project_file.txt",sdCardData.c_str());
       lcd.clear();
-      lcd.print("SD LOG: ");
-      lcd.setCursor(0,1);
-      lcd.print("SUCCESS");
+      lcd.print("LOGGING TO SD");
       prevLogTime = millis();
       vTaskDelay(pdMS_TO_TICKS(1000));
       lcd.clear();      

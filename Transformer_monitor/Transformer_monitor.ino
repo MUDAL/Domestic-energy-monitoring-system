@@ -2,6 +2,7 @@
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <WiFiManager.h>
+#include <PubSubClient.h>
 #include <Wire.h>
 #include <PZEM004Tv30.h>
 #include <LiquidCrystal_I2C.h> //Version 1.1.2
@@ -18,13 +19,18 @@
 //Maximum number of characters for ThingSpeak credentials
 #define SIZE_CHANNEL_ID        30
 #define SIZE_API_KEY           50
+//Maximum number of characters for HiveMQ topic(s)
+#define SIZE_TOPIC             30
 
 //Shared resources
 //Define textboxes for IFTTT event name and key  
 WiFiManagerParameter eventName("0","Event name","",SIZE_EVENT_NAME);
 WiFiManagerParameter iftttKey("1","IFTTT key","",SIZE_IFTTT_KEY);
+//Define textboxes for ThingSpeak credentials
 WiFiManagerParameter channelId("2","ThingSpeak channel ID","",SIZE_CHANNEL_ID);
 WiFiManagerParameter apiKey("3","ThingSpeak API key","",SIZE_API_KEY);
+//Define textbox for MQTT publish topic
+WiFiManagerParameter pubTopic("4","HiveMQ Publish topic","",SIZE_TOPIC);
 Preferences preferences; //for accessing ESP32 flash memory
 
 //Variables used for intertask communication
@@ -35,10 +41,15 @@ float pzemEnergy = 0; //in kWh
 //True if data was successfully sent to server 
 bool isThingSpeakOk = false;
 bool isIftttOk = false;
+//Set if data is received from MQTT broker to reset PZEM's energy counter
+uint8_t resetEnergyCounter = 0;
+//True if PZEM's energy counter was successfully reset
+bool isEnergyReset = false;
 
 //Task handle(s)
 TaskHandle_t wifiTaskHandle;
 TaskHandle_t dispLogTaskHandle;
+TaskHandle_t mqttTaskHandle;
 
 /**
  * @brief Make an HTTP GET request to the specified server
@@ -104,6 +115,7 @@ void setup()
   xTaskCreatePinnedToCore(WiFiManagementTask,"",7000,NULL,1,&wifiTaskHandle,1);
   xTaskCreatePinnedToCore(ApplicationTask,"",50000,NULL,1,NULL,1);
   xTaskCreatePinnedToCore(DisplayAndLogTask,"",40000,NULL,1,&dispLogTaskHandle,1);
+  xTaskCreatePinnedToCore(MqttTask,"",7000,NULL,1,&mqttTaskHandle,1);
 }
 
 void loop() 
@@ -124,6 +136,7 @@ void WiFiManagementTask(void* pvParameters)
   wm.addParameter(&iftttKey);
   wm.addParameter(&channelId);
   wm.addParameter(&apiKey);  
+  wm.addParameter(&pubTopic);
   wm.setConfigPortalBlocking(false);
   wm.setSaveParamsCallback(WiFiManagerCallback);   
   //Auto-connect to previous network if available.
@@ -211,19 +224,25 @@ void ApplicationTask(void* pvParameters)
       vTaskResume(wifiTaskHandle);
       isWifiTaskSuspended = false;
     }
-      
+    //Reset PZEM's energy counter if MQTT command is received
+    if(resetEnergyCounter)
+    {
+      isEnergyReset = pzem.resetEnergy();
+      resetEnergyCounter = 0;
+    }
     //Critical section [Get data from PZEM module periodically]
     if((millis() - prevPzemTime) >= 1000)
     {
+      vTaskSuspend(mqttTaskHandle);
       vTaskSuspend(dispLogTaskHandle);
       pzemVoltage = pzem.voltage(); //in volts
       pzemCurrent = pzem.current(); //in amps
       pzemPower = pzem.power(); //in watts
-      pzemEnergy = pzem.energy(); //in kWh 
+      pzemEnergy = pzem.energy(); //in kWh
+      vTaskResume(mqttTaskHandle); 
       vTaskResume(dispLogTaskHandle);
       prevPzemTime = millis();
     }
-
     //Send data to the cloud [periodically]      
     if(WiFi.status() == WL_CONNECTED && ((millis() - prevConnectTime) >= 20000))
     {
@@ -231,7 +250,6 @@ void ApplicationTask(void* pvParameters)
       preferences.getBytes("1",prevIftttKey,SIZE_IFTTT_KEY);  
       preferences.getBytes("2",prevChannelId,SIZE_CHANNEL_ID);
       preferences.getBytes("3",prevApiKey,SIZE_API_KEY); 
-
       //Debug PZEM
       Serial.print("Voltage: ");
       Serial.println(pzemVoltage);
@@ -241,13 +259,11 @@ void ApplicationTask(void* pvParameters)
       Serial.println(pzemPower);
       Serial.print("Energy: ");
       Serial.println(pzemEnergy,3); //3dp
-      
       //Encode PZEM data to be sent to ThingSpeak
       ThingSpeak.setField(1,pzemVoltage);
       ThingSpeak.setField(2,pzemCurrent); 
       ThingSpeak.setField(3,pzemPower); 
       ThingSpeak.setField(4,pzemEnergy);
-      
       //Convert channel ID from string to integer
       String idString = String(prevChannelId);
       uint32_t idInteger = idString.toInt();
@@ -333,7 +349,7 @@ void DisplayAndLogTask(void* pvParameters)
   const uint8_t displayState1 = 0;
   const uint8_t displayState2 = 1;
   uint8_t displayState = displayState1;
-
+  
   uint32_t prevTime = millis();
   uint32_t prevLogTime = millis();
   
@@ -390,10 +406,60 @@ void DisplayAndLogTask(void* pvParameters)
       prevLogTime = millis();
       vTaskDelay(pdMS_TO_TICKS(1000));
       lcd.clear();      
-    }    
+    }
+    //Display message if PZEM's energy counter was successfully reset
+    if(isEnergyReset)
+    {
+      lcd.clear();
+      lcd.print("ENERGY RESET:");
+      lcd.setCursor(0,1);
+      lcd.print("SUCCESS");
+      isEnergyReset = false;
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      lcd.clear();
+    }
   }
 }
 
+/**
+ * @brief Handles communication with the HiveMQ broker.
+*/
+void MqttTask(void* pvParameters)
+{
+  static WiFiClient wifiClient;
+  static PubSubClient mqttClient(wifiClient);
+  char prevPubTopic[SIZE_TOPIC] = {0};
+  const char *mqttBroker = "broker.hivemq.com";
+  const uint16_t mqttPort = 1883;  
+  
+  while(1)
+  {
+    if(WiFi.status() == WL_CONNECTED)
+    {       
+      if(!mqttClient.connected())
+      {
+        preferences.getBytes("4",prevPubTopic,SIZE_TOPIC);  
+        mqttClient.setServer(mqttBroker,mqttPort);
+        mqttClient.setCallback(MqttCallback);
+        while(!mqttClient.connected())
+        {
+          String clientID = String(WiFi.macAddress());
+          Serial.print("MAC address = ");
+          Serial.println(clientID.c_str());
+          if(mqttClient.connect(clientID.c_str()))
+          {
+            Serial.println("Connected to HiveMQ broker");
+            mqttClient.subscribe(prevPubTopic);
+          }
+        } 
+      }
+      else
+      {
+        mqttClient.loop(); //handles mqtt callback
+      }
+    }
+  }
+}
 
 /**
  * @brief Callback function that is called whenever WiFi
@@ -406,15 +472,28 @@ void WiFiManagerCallback(void)
   char prevIftttKey[SIZE_IFTTT_KEY] = {0};
   char prevChannelId[SIZE_CHANNEL_ID] = {0};
   char prevApiKey[SIZE_API_KEY] = {0};
+  char prevPubTopic[SIZE_TOPIC] = {0};
   //Get previously stored data  
   preferences.getBytes("0",prevEventName,SIZE_EVENT_NAME);
   preferences.getBytes("1",prevIftttKey,SIZE_IFTTT_KEY);  
   preferences.getBytes("2",prevChannelId,SIZE_CHANNEL_ID);
-  preferences.getBytes("3",prevApiKey,SIZE_API_KEY);   
+  preferences.getBytes("3",prevApiKey,SIZE_API_KEY); 
+  preferences.getBytes("4",prevPubTopic,SIZE_TOPIC);    
   //Store data in flash if the new ones are not the same as the old.  
   StoreNewFlashData("0",eventName.getValue(),prevEventName,SIZE_EVENT_NAME);
   StoreNewFlashData("1",iftttKey.getValue(),prevIftttKey,SIZE_IFTTT_KEY);
   StoreNewFlashData("2",channelId.getValue(),prevChannelId,SIZE_CHANNEL_ID);
   StoreNewFlashData("3",apiKey.getValue(),prevApiKey,SIZE_API_KEY);  
+  StoreNewFlashData("4",pubTopic.getValue(),prevPubTopic,SIZE_TOPIC);
 }
 
+/**
+ * @brief Callback function that is called whenever data is received
+ * from the HiveMQ broker.  
+*/
+void MqttCallback(char *topic,byte *payload,uint32_t len) 
+{
+  Serial.print("MQTT receive:");
+  resetEnergyCounter = (payload[0] - '0');
+  Serial.println(resetEnergyCounter);
+}

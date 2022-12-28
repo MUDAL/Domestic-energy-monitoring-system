@@ -233,12 +233,22 @@ void ApplicationTask(void* pvParameters)
     //Critical section [Get data from PZEM module periodically]
     if((millis() - prevPzemTime) >= 1000)
     {
+      if(!isWifiTaskSuspended)
+      {
+        vTaskSuspend(wifiTaskHandle);
+        isWifiTaskSuspended = true;
+      }
       vTaskSuspend(mqttTaskHandle);
       vTaskSuspend(dispLogTaskHandle);
       pzemVoltage = pzem.voltage(); //in volts
       pzemCurrent = pzem.current(); //in amps
       pzemPower = pzem.power(); //in watts
       pzemEnergy = pzem.energy(); //in kWh
+      if(isWifiTaskSuspended)
+      {
+        vTaskResume(wifiTaskHandle);
+        isWifiTaskSuspended = false;
+      }
       vTaskResume(mqttTaskHandle); 
       vTaskResume(dispLogTaskHandle);
       prevPzemTime = millis();

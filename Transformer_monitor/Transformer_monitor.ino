@@ -289,12 +289,13 @@ void ApplicationTask(void* pvParameters)
       {
         isThingSpeakOk = false;
         Serial.println("THINGSPEAK: HTTP error");
-      }
-           
+      }    
       String iftttServerPath = "http://maker.ifttt.com/trigger/" + String(prevEventName) + 
-                               "/with/key/" + String(prevIftttKey) + "?value1=" + String(pzemVoltage) 
-                               + "&value2=" + String(pzemCurrent) +"&value3=" + String(pzemPower)
-                               + "&value4=" + String(pzemEnergy,3); //3dp for energy 
+                               "/with/key/" + String(prevIftttKey) + 
+                               "?value1=" + String(pzemVoltage) + "V" +
+                               "&value2=" + String(pzemCurrent) + "A" +
+                               "&value3=" + String(pzemPower) + "W____" +
+                               String(pzemEnergy,3) + "kWh";  
       //[Send PZEM data to IFTTT (IFTTT sends the data to Google Sheets)]                                                      
       HttpGetRequest(iftttServerPath.c_str(),&httpCode);
       //Check HTTP response from IFTTT

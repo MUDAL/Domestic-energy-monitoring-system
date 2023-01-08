@@ -408,9 +408,9 @@ void DisplayAndLogTask(void* pvParameters)
       DateTime dateTime = rtc.now();
       String sdCardData = String(dateTime.day()) + "/" + String(dateTime.month()) + "/" + 
                           String(dateTime.year()) + " " + String(dateTime.hour()) + ":" + 
-                          String(dateTime.minute()) + " ---> " + String(pzemVoltage) + "V, " + 
-                          String(pzemCurrent) + "A, " + String(pzemPower) + "W, " + 
-                          String(pzemEnergy) + "kWh\n";   
+                          String(dateTime.minute()) + " ---> " + String(pzemVoltage,2) + "V, " + 
+                          String(pzemCurrent,2) + "A, " + String(pzemPower,2) + "W, " + 
+                          String(pzemEnergy,3) + "kWh\n";   
       SD_AppendFile("/project_file.txt",sdCardData.c_str());
       lcd.clear();
       lcd.print("LOGGING TO SD");

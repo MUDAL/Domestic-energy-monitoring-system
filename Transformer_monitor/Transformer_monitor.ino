@@ -292,9 +292,9 @@ void ApplicationTask(void* pvParameters)
       }    
       String iftttServerPath = "http://maker.ifttt.com/trigger/" + String(prevEventName) + 
                                "/with/key/" + String(prevIftttKey) + 
-                               "?value1=" + String(pzemVoltage) + "V" +
-                               "&value2=" + String(pzemCurrent) + "A" +
-                               "&value3=" + String(pzemPower) + "W____" +
+                               "?value1=" + String(pzemVoltage,2) + "V" +
+                               "&value2=" + String(pzemCurrent,2) + "A" +
+                               "&value3=" + String(pzemPower,2) + "W_" +
                                String(pzemEnergy,3) + "kWh";  
       //[Send PZEM data to IFTTT (IFTTT sends the data to Google Sheets)]                                                      
       HttpGetRequest(iftttServerPath.c_str(),&httpCode);

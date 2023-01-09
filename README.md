@@ -11,5 +11,9 @@ and uploads to the cloud (Google Sheets and ThingSpeak).
 1. ``preferences.begin("T-Mon",false);``. I observed that a short string as the first argument    
 of ``begin`` method helps in avoiding some issues with accessing the flash memory via the   
 ``Preferences`` library. ``T-Mon`` was used as a short form for ``Transformer-monitor``.  
+The initial application of this project was transformer monitoring but the requirements changed  
+and the system was designed to monitor electrical parameters in a residential building. ``T-Mon``  
+was retained but the current application of the system is ``domestic energy monitoring``.  
+ 
 
  

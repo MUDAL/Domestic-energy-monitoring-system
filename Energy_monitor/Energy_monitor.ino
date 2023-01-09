@@ -110,7 +110,7 @@ void setup()
 {
   setCpuFrequencyMhz(80);
   Serial.begin(115200);
-  preferences.begin("T-Mon",false); //T-Mon : Transformer monitor 
+  preferences.begin("T-Mon",false); 
   //Create tasks
   xTaskCreatePinnedToCore(WiFiManagementTask,"",7000,NULL,1,&wifiTaskHandle,1);
   xTaskCreatePinnedToCore(ApplicationTask,"",50000,NULL,1,NULL,1);

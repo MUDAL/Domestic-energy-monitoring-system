@@ -1,6 +1,7 @@
-# Transformer-monitoring-system
+# Energy-monitoring-system
 Client: Mary  
-Monitors parameters of a power transformer, logs the data, and uploads to Google sheets.   
+Monitors electrical parameters (voltage,current,power, and energy), logs the data (to an SD card),  
+and uploads to the cloud (Google Sheets and ThingSpeak).     
 
 ## Credits  
 1. https://randomnerdtutorials.com/esp32-esp8266-publish-sensor-readings-to-google-sheets/  

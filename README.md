@@ -9,7 +9,8 @@ points in a building, allowing users to monitor their energy usage in real-time.
 1. Measurement of current, voltage, power, and energy consumed in a building.   
 2. Periodic display of measured data on an LCD.   
 3. Periodic logging of measured data to an SD card.   
-4. Periodic uploading of data to the cloud (ThingSpeak Server and Google Sheets).   
+4. Periodic uploading of data to the cloud (ThingSpeak Server and Google Sheets).  
+5. Wi-Fi provisioning.   
 
 ## Hardware  
 1. ESP32 development board  
@@ -21,7 +22,7 @@ points in a building, allowing users to monitor their energy usage in real-time.
 7. 3-pin plug   
 
 ## Software  
-The system is developed using the ESP-IDF FreeRTOS software platform. The ESP32 is programmed using C++.    
+The system was developed using the ESP-IDF FreeRTOS software platform. The ESP32 was programmed using C++.    
 The code provides real-time measurement and display of current, voltage, power, and energy consumption,  
 as well as data logging to an SD card and data upload to the ThingSpeak server and Google Sheets.   
 

@@ -24,7 +24,10 @@ points in a building, allowing users to monitor their energy usage in real-time.
 ## Software  
 The system was developed using the ESP-IDF FreeRTOS software platform. The ESP32 was programmed using C++.    
 The code provides real-time measurement and display of current, voltage, power, and energy consumption,  
-as well as data logging to an SD card and data upload to the ThingSpeak server and Google Sheets.   
+as well as data logging to an SD card and data upload to the ThingSpeak server and Google Sheets.  
+
+## Software architecture  
+![ss_sl drawio](https://user-images.githubusercontent.com/46250887/224770270-1bf60a7b-530a-4b28-9697-761c83392917.png)  
 
 ## Images of the prototype   
 ![20230214_095808](https://user-images.githubusercontent.com/46250887/218693188-4467e4f6-f67c-401f-bfd4-25fa2a50df3e.jpg)
@@ -46,3 +49,11 @@ The initial application of this project was transformer monitoring but the requi
 and the system was designed to monitor electrical parameters in a residential building. ``T-Mon``  
 was retained but the current application of the system is ``domestic energy monitoring``.  
  
+## Recommendations  
+1. Add a feature to set energy limits (through a mobile application). If the system's operation does not  
+comply with the limits, a notification should be sent to the user (e.g. through SMS).  
+2. Add a feature to prevent users from removing the SD card each time they need to view their logged data.  
+One way this could be achieved is the use of ``FTP`` for file transfer from the system to a connected device  
+(e.g. a PC) which will run an FTP server software.  
+Another option is to set the system up as a local server that will enable other devices to download the file  
+containing the logged data through a web browser.  

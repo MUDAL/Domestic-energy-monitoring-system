@@ -24,7 +24,10 @@ points in a building, allowing users to monitor their energy usage in real-time.
 ## Software  
 The system was developed using the ESP-IDF FreeRTOS software platform. The ESP32 was programmed using C++.    
 The code provides real-time measurement and display of current, voltage, power, and energy consumption,  
-as well as data logging to an SD card and data upload to the ThingSpeak server and Google Sheets.   
+as well as data logging to an SD card and data upload to the ThingSpeak server and Google Sheets.  
+
+## Software architecture  
+![ss_sl drawio](https://user-images.githubusercontent.com/46250887/224770270-1bf60a7b-530a-4b28-9697-761c83392917.png)  
 
 ## Images of the prototype   
 ![20230214_095808](https://user-images.githubusercontent.com/46250887/218693188-4467e4f6-f67c-401f-bfd4-25fa2a50df3e.jpg)

@@ -30,6 +30,8 @@ as well as data logging to an SD card and data upload to the ThingSpeak server a
 ![ss_sl drawio](https://user-images.githubusercontent.com/46250887/224770270-1bf60a7b-530a-4b28-9697-761c83392917.png)  
 
 ## Images of the prototype   
+![20230314_154550](https://user-images.githubusercontent.com/46250887/225056313-a61fb779-47ac-4ccb-96ba-5e7eebf49878.jpg)  
+![20230314_154655](https://user-images.githubusercontent.com/46250887/225056379-8224e1f4-f767-416e-ba46-11a14c7af4e9.jpg)  
 ![20230214_095808](https://user-images.githubusercontent.com/46250887/218693188-4467e4f6-f67c-401f-bfd4-25fa2a50df3e.jpg)
 ![20230214_095804](https://user-images.githubusercontent.com/46250887/218693269-3f58c477-486f-4b24-bbf2-b4b3f9e1f41c.jpg)
 ![20230214_095738](https://user-images.githubusercontent.com/46250887/218693367-19334fc0-fde2-4a42-8139-cdb86ab65094.jpg)

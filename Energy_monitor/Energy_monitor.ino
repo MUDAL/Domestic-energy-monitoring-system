@@ -398,10 +398,9 @@ void DisplayAndLogTask(void* pvParameters)
         }
         break;
     }
-    NotifyUserIfConnIsOk(lcd,"ThingSpeak",&isThingSpeakOk);
-    NotifyUserIfConnIsOk(lcd,"IFTTT",&isIftttOk);
+    
     //Log data to SD card periodically
-    if((millis() - prevLogTime) >= 40000)
+    if((millis() - prevLogTime) >= 20000)
     {
       Serial.println("Logging to SD card");
       //Get current date and time and concatenate with PZEM readings
@@ -417,7 +416,11 @@ void DisplayAndLogTask(void* pvParameters)
       prevLogTime = millis();
       vTaskDelay(pdMS_TO_TICKS(1000));
       lcd.clear();      
-    }
+    }    
+    
+    NotifyUserIfConnIsOk(lcd,"ThingSpeak",&isThingSpeakOk);
+    NotifyUserIfConnIsOk(lcd,"IFTTT",&isIftttOk);
+    
     //Display message if PZEM's energy counter was successfully reset
     if(isEnergyReset)
     {

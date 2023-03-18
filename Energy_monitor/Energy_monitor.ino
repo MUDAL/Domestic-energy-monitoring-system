@@ -116,13 +116,12 @@ static void NotifyUserIfConnIsOk(LiquidCrystal_I2C& lcd,char* server,bool* isSer
 {
   if(*isServerOk)
   {
-    TickType_t prevTick = xTaskGetTickCount();
     lcd.clear();
     lcd.print(server);
     lcd.setCursor(0,1);
     lcd.print("SUCCESS");
     *isServerOk = false;
-    vTaskDelayUntil(&prevTick,pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(1500));
     lcd.clear();
   }
 }
@@ -416,23 +415,21 @@ void DisplayAndLogTask(void* pvParameters)
                           String(pzemCurrent,2) + "A, " + String(pzemPower,2) + "W, " + 
                           String(pzemEnergy,3) + "kWh\n";   
       SD_AppendFile("/project_file.txt",sdCardData.c_str());
-      TickType_t prevTick = xTaskGetTickCount();
       lcd.clear();
       lcd.print("LOGGING TO SD");
       prevLogTime = millis();
-      vTaskDelayUntil(&prevTick,pdMS_TO_TICKS(1000));
+      vTaskDelay(pdMS_TO_TICKS(1500));
       lcd.clear();      
     }     
     //Display message if PZEM's energy counter was successfully reset
     if(isEnergyReset)
     {
-      TickType_t prevTick = xTaskGetTickCount();
       lcd.clear();
       lcd.print("ENERGY RESET:");
       lcd.setCursor(0,1);
       lcd.print("SUCCESS");
       isEnergyReset = false;
-      vTaskDelayUntil(&prevTick,pdMS_TO_TICKS(1000));
+      vTaskDelay(pdMS_TO_TICKS(1500));
       lcd.clear();
     }
   }

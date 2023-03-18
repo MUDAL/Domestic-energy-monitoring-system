@@ -23,28 +23,23 @@
 #define SIZE_TOPIC             30
 
 //Shared resources
-//Define textboxes for IFTTT event name and key  
 WiFiManagerParameter eventName("0","Event name","",SIZE_EVENT_NAME);
 WiFiManagerParameter iftttKey("1","IFTTT key","",SIZE_IFTTT_KEY);
-//Define textboxes for ThingSpeak credentials
 WiFiManagerParameter channelId("2","ThingSpeak channel ID","",SIZE_CHANNEL_ID);
 WiFiManagerParameter apiKey("3","ThingSpeak API key","",SIZE_API_KEY);
-//Define textbox for MQTT publish topic
 WiFiManagerParameter pubTopic("4","HiveMQ Publish topic","",SIZE_TOPIC);
 Preferences preferences; //for accessing ESP32 flash memory
 
-//Variables used for intertask communication
+//Global variables
+bool isWifiTaskSuspended = false;
 float pzemVoltage = 0; //in volts
 float pzemCurrent = 0; //in amps
 float pzemPower = 0; //in watts
-float pzemEnergy = 0; //in kWh
-//True if data was successfully sent to server 
+float pzemEnergy = 0; //in kWh 
 bool isThingSpeakOk = false;
 bool isIftttOk = false;
-//Set if data is received from MQTT broker to reset PZEM's energy counter
-uint8_t resetEnergyCounter = 0;
-//True if PZEM's energy counter was successfully reset
-bool isEnergyReset = false;
+uint8_t resetEnergyCounter = 0; //Set if data is received from MQTT broker to reset PZEM's energy counter
+bool isEnergyReset = false; //Set if PZEM's energy counter was successfully reset
 
 //Task handle(s)
 TaskHandle_t wifiTaskHandle;
@@ -90,6 +85,30 @@ static void SD_AppendFile(const char* path,const char* message)
 }
 
 /**
+ * @brief Suspend WiFi task if it wasn't previously suspended.
+*/
+static void SuspendWiFiTask(void)
+{
+  if(!isWifiTaskSuspended)
+  {
+    vTaskSuspend(wifiTaskHandle);
+    isWifiTaskSuspended = true;
+  }  
+}
+
+/**
+ * @brief Resume WiFi task if it was previously suspended.
+*/
+static void ResumeWiFiTask(void)
+{
+  if(isWifiTaskSuspended)
+  {
+    vTaskResume(wifiTaskHandle);
+    isWifiTaskSuspended = false;
+  }
+}
+
+/**
  * @brief Notify the user if connection to a server (ThingSpeak or IFTTT) is
  * OK i.e. data was successfully sent to the server.
 */
@@ -97,12 +116,14 @@ static void NotifyUserIfConnIsOk(LiquidCrystal_I2C& lcd,char* server,bool* isSer
 {
   if(*isServerOk)
   {
+    TickType_t prevTick = xTaskGetTickCount();
     lcd.clear();
     lcd.print(server);
     lcd.setCursor(0,1);
     lcd.print("SUCCESS");
     *isServerOk = false;
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelayUntil(&prevTick,pdMS_TO_TICKS(1000));
+    lcd.clear();
   }
 }
 
@@ -206,7 +227,6 @@ void ApplicationTask(void* pvParameters)
   
   uint32_t prevPzemTime = millis();  
   uint32_t prevConnectTime = millis();
-  bool isWifiTaskSuspended = false;
  
   while(1)
   {
@@ -224,35 +244,30 @@ void ApplicationTask(void* pvParameters)
       vTaskResume(wifiTaskHandle);
       isWifiTaskSuspended = false;
     }
+    
     //Reset PZEM's energy counter if MQTT command is received
     if(resetEnergyCounter)
     {
       isEnergyReset = pzem.resetEnergy();
       resetEnergyCounter = 0;
     }
+    
     //Critical section [Get data from PZEM module periodically]
     if((millis() - prevPzemTime) >= 1000)
     {
-      if(!isWifiTaskSuspended)
-      {
-        vTaskSuspend(wifiTaskHandle);
-        isWifiTaskSuspended = true;
-      }
+      SuspendWiFiTask();
       vTaskSuspend(mqttTaskHandle);
       vTaskSuspend(dispLogTaskHandle);
       pzemVoltage = pzem.voltage(); //in volts
       pzemCurrent = pzem.current(); //in amps
       pzemPower = pzem.power(); //in watts
       pzemEnergy = pzem.energy(); //in kWh
-      if(isWifiTaskSuspended)
-      {
-        vTaskResume(wifiTaskHandle);
-        isWifiTaskSuspended = false;
-      }
-      vTaskResume(mqttTaskHandle); 
+      ResumeWiFiTask();
+      vTaskResume(mqttTaskHandle);
       vTaskResume(dispLogTaskHandle);
       prevPzemTime = millis();
     }
+    
     //Send data to the cloud [periodically]      
     if(WiFi.status() == WL_CONNECTED && ((millis() - prevConnectTime) >= 20000))
     {
@@ -260,15 +275,7 @@ void ApplicationTask(void* pvParameters)
       preferences.getBytes("1",prevIftttKey,SIZE_IFTTT_KEY);  
       preferences.getBytes("2",prevChannelId,SIZE_CHANNEL_ID);
       preferences.getBytes("3",prevApiKey,SIZE_API_KEY); 
-      //Debug PZEM
-      Serial.print("Voltage: ");
-      Serial.println(pzemVoltage);
-      Serial.print("Current: ");
-      Serial.println(pzemCurrent);
-      Serial.print("Power: ");
-      Serial.println(pzemPower);
-      Serial.print("Energy: ");
-      Serial.println(pzemEnergy,3); //3dp
+      
       //Encode PZEM data to be sent to ThingSpeak
       ThingSpeak.setField(1,pzemVoltage);
       ThingSpeak.setField(2,pzemCurrent); 
@@ -277,39 +284,37 @@ void ApplicationTask(void* pvParameters)
       //Convert channel ID from string to integer
       String idString = String(prevChannelId);
       uint32_t idInteger = idString.toInt();
+      
       //[Send data to ThingSpeak]
       httpCode = ThingSpeak.writeFields(idInteger,prevApiKey); 
       //Check HTTP response from ThingSpeak
       if(httpCode == HTTP_CODE_OK)
       {
         isThingSpeakOk = true;
-        Serial.println("THINGSPEAK: HTTP request successful");
       }
       else
       {
         isThingSpeakOk = false;
-        Serial.println("THINGSPEAK: HTTP error");
-      }    
+      }  
+       
       String iftttServerPath = "http://maker.ifttt.com/trigger/" + String(prevEventName) + 
                                "/with/key/" + String(prevIftttKey) + 
                                "?value1=" + String(pzemVoltage,2) + "V" +
                                "&value2=" + String(pzemCurrent,2) + "A" +
                                "&value3=" + String(pzemPower,2) + "W_" +
                                String(pzemEnergy,3) + "kWh";  
+      
       //[Send PZEM data to IFTTT (IFTTT sends the data to Google Sheets)]                                                      
       HttpGetRequest(iftttServerPath.c_str(),&httpCode);
       //Check HTTP response from IFTTT
       if(httpCode == HTTP_CODE_OK) 
       {
         isIftttOk = true;
-        Serial.println("IFTTT: HTTP request successful ");
       } 
       else 
       {
         isIftttOk = false;
-        Serial.print("IFTTT: HTTP error code = ");
-        Serial.println(httpCode);
-      }      
+      }     
       prevConnectTime = millis(); 
     }
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -397,12 +402,12 @@ void DisplayAndLogTask(void* pvParameters)
           lcd.clear();
         }
         break;
-    }
-    
+    }   
+    NotifyUserIfConnIsOk(lcd,"ThingSpeak",&isThingSpeakOk);
+    NotifyUserIfConnIsOk(lcd,"IFTTT",&isIftttOk);
     //Log data to SD card periodically
     if((millis() - prevLogTime) >= 20000)
     {
-      Serial.println("Logging to SD card");
       //Get current date and time and concatenate with PZEM readings
       DateTime dateTime = rtc.now();
       String sdCardData = String(dateTime.day()) + "/" + String(dateTime.month()) + "/" + 
@@ -411,25 +416,23 @@ void DisplayAndLogTask(void* pvParameters)
                           String(pzemCurrent,2) + "A, " + String(pzemPower,2) + "W, " + 
                           String(pzemEnergy,3) + "kWh\n";   
       SD_AppendFile("/project_file.txt",sdCardData.c_str());
+      TickType_t prevTick = xTaskGetTickCount();
       lcd.clear();
       lcd.print("LOGGING TO SD");
       prevLogTime = millis();
-      vTaskDelay(pdMS_TO_TICKS(1000));
+      vTaskDelayUntil(&prevTick,pdMS_TO_TICKS(1000));
       lcd.clear();      
-    }    
-    
-    NotifyUserIfConnIsOk(lcd,"ThingSpeak",&isThingSpeakOk);
-    NotifyUserIfConnIsOk(lcd,"IFTTT",&isIftttOk);
-    
+    }     
     //Display message if PZEM's energy counter was successfully reset
     if(isEnergyReset)
     {
+      TickType_t prevTick = xTaskGetTickCount();
       lcd.clear();
       lcd.print("ENERGY RESET:");
       lcd.setCursor(0,1);
       lcd.print("SUCCESS");
       isEnergyReset = false;
-      vTaskDelay(pdMS_TO_TICKS(1000));
+      vTaskDelayUntil(&prevTick,pdMS_TO_TICKS(1000));
       lcd.clear();
     }
   }

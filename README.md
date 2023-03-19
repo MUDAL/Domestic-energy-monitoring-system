@@ -57,3 +57,7 @@ One way this could be achieved is the use of ``FTP`` for file transfer from the 
 (e.g. a PC) which will run an FTP server software.  
 Another option is to set the system up as a local server that will enable other devices to download the file  
 containing the logged data through a web browser.  
+
+## Improvements made  
+1. Display of 0 instead of ``NAN`` whenever the system isn't plugged.  
+2. Replacement of code utilizing dynamic memory allocation with code utilizing static memory allocation.  

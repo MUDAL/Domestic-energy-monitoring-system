@@ -126,6 +126,80 @@ static void NotifyUserIfConnIsOk(LiquidCrystal_I2C& lcd,char* server,bool* isSer
   }
 }
 
+/**
+ * @brief Converts an integer to a string.
+*/
+static void IntegerToString(uint32_t integer,char* stringPtr)
+{
+  if(integer == 0)
+  {  
+    stringPtr[0] = '0';
+    return;
+  }
+  uint32_t integerCopy = integer;
+  uint8_t numOfDigits = 0;
+
+  while(integerCopy > 0)
+  {
+    integerCopy /= 10;
+    numOfDigits++;
+  }
+  while(integer > 0)
+  {
+    stringPtr[numOfDigits - 1] = '0' + (integer % 10);
+    integer /= 10;
+    numOfDigits--;
+  }
+}
+
+/**
+ * @brief Converts a float to a string.
+ * NB: The 'multiplier' parameter expects an argument that is a multiple of 10.
+*/
+static void FloatToString(float floatPt,char* stringPtr,uint32_t multiplier)
+{
+  uint32_t floatAsInt = lround(floatPt * multiplier);
+  char quotientBuff[20] = {0};
+  char remainderBuff[20] = {0};
+  IntegerToString((floatAsInt / multiplier),quotientBuff);
+  IntegerToString((floatAsInt % multiplier),remainderBuff);
+  strcat(stringPtr,quotientBuff);
+  strcat(stringPtr,".");
+  strcat(stringPtr,remainderBuff);
+}
+
+/**
+ * @brief Converts a string to an integer.
+ * e.g.
+ * "932" to 932:
+ * '9' - '0' = 9
+ * '3' - '0' = 3
+ * '2' - '0' = 2
+ * 9 x 10^2 + 3 x 10^1 + 2 x 10^0 = 932.
+*/
+static void StringToInteger(char* stringPtr,uint32_t* integerPtr)
+{
+  *integerPtr = 0;
+  uint8_t len = strlen(stringPtr);
+  uint32_t j = 1;
+  for(uint8_t i = 0; i < len; i++)
+  {
+    *integerPtr += ((stringPtr[len - i - 1] - '0') * j);
+    j *= 10;
+  }
+}
+
+/**
+ * @brief Set float to zero if it is not a number.
+*/
+static void SetToZeroIfNaN(float* floatPtr)
+{
+  if(isnan(*floatPtr))
+  {
+    *floatPtr = 0.0;
+  }
+}
+
 void setup() 
 {
   setCpuFrequencyMhz(80);
@@ -216,6 +290,7 @@ void ApplicationTask(void* pvParameters)
 {
   static WiFiClient wifiClient;
   static PZEM004Tv30 pzem(&Serial2,16,17);
+  static char iftttServerPath[300];
   ThingSpeak.begin(wifiClient);
   int httpCode; //HTTP response code
   //Previously stored data (in ESP32's flash)
@@ -257,10 +332,17 @@ void ApplicationTask(void* pvParameters)
       SuspendWiFiTask();
       vTaskSuspend(mqttTaskHandle);
       vTaskSuspend(dispLogTaskHandle);
+      
       pzemVoltage = pzem.voltage(); //in volts
       pzemCurrent = pzem.current(); //in amps
       pzemPower = pzem.power(); //in watts
       pzemEnergy = pzem.energy(); //in kWh
+      
+      SetToZeroIfNaN(&pzemVoltage);
+      SetToZeroIfNaN(&pzemCurrent);
+      SetToZeroIfNaN(&pzemPower);
+      SetToZeroIfNaN(&pzemEnergy);
+      
       ResumeWiFiTask();
       vTaskResume(mqttTaskHandle);
       vTaskResume(dispLogTaskHandle);
@@ -280,13 +362,10 @@ void ApplicationTask(void* pvParameters)
       ThingSpeak.setField(2,pzemCurrent); 
       ThingSpeak.setField(3,pzemPower); 
       ThingSpeak.setField(4,pzemEnergy);
-      //Convert channel ID from string to integer
-      String idString = String(prevChannelId);
-      uint32_t idInteger = idString.toInt();
       
-      //[Send data to ThingSpeak]
-      httpCode = ThingSpeak.writeFields(idInteger,prevApiKey); 
-      //Check HTTP response from ThingSpeak
+      uint32_t idInteger = 0;
+      StringToInteger(prevChannelId,&idInteger); //Convert channel ID from string to integer
+      httpCode = ThingSpeak.writeFields(idInteger,prevApiKey); //Send data to ThingSpeak
       if(httpCode == HTTP_CODE_OK)
       {
         isThingSpeakOk = true;
@@ -295,17 +374,34 @@ void ApplicationTask(void* pvParameters)
       {
         isThingSpeakOk = false;
       }  
-       
-      String iftttServerPath = "http://maker.ifttt.com/trigger/" + String(prevEventName) + 
-                               "/with/key/" + String(prevIftttKey) + 
-                               "?value1=" + String(pzemVoltage,2) + "V" +
-                               "&value2=" + String(pzemCurrent,2) + "A" +
-                               "&value3=" + String(pzemPower,2) + "W_" +
-                               String(pzemEnergy,3) + "kWh";  
+
+      char voltageBuff[7] = {0};
+      char currentBuff[7] = {0};
+      char powerBuff[11] = {0};
+      char energyBuff[11] = {0};
       
-      //[Send PZEM data to IFTTT (IFTTT sends the data to Google Sheets)]                                                      
-      HttpGetRequest(iftttServerPath.c_str(),&httpCode);
-      //Check HTTP response from IFTTT
+      FloatToString(pzemVoltage,voltageBuff,100);
+      FloatToString(pzemCurrent,currentBuff,100);
+      FloatToString(pzemPower,powerBuff,100);
+      FloatToString(pzemEnergy,energyBuff,1000);
+
+      strcat(iftttServerPath,"http://maker.ifttt.com/trigger/");
+      strcat(iftttServerPath,prevEventName);
+      strcat(iftttServerPath,"/with/key/");
+      strcat(iftttServerPath,prevIftttKey);
+      strcat(iftttServerPath,"?value1=");
+      strcat(iftttServerPath,voltageBuff);
+      strcat(iftttServerPath,"V&value2=");
+      strcat(iftttServerPath,currentBuff);
+      strcat(iftttServerPath,"A&value3=");
+      strcat(iftttServerPath,powerBuff);
+      strcat(iftttServerPath,"W_");
+      strcat(iftttServerPath,energyBuff);
+      strcat(iftttServerPath,"kWh");
+      
+      HttpGetRequest(iftttServerPath,&httpCode); //Send PZEM data to IFTTT
+      uint32_t iftttServerPathLen = strlen(iftttServerPath);
+      memset(iftttServerPath,'\0',iftttServerPathLen);
       if(httpCode == HTTP_CODE_OK) 
       {
         isIftttOk = true;
@@ -328,6 +424,8 @@ void DisplayAndLogTask(void* pvParameters)
 {   
   static LiquidCrystal_I2C lcd(0x27,16,2); 
   static RTC_DS3231 rtc;  
+  static char sdCardData[120];
+  static DateTime dateTime;
   rtc.begin();
     
   //LCD init and startup message
@@ -367,7 +465,7 @@ void DisplayAndLogTask(void* pvParameters)
   
   uint32_t prevTime = millis();
   uint32_t prevLogTime = millis();
-  
+   
   while(1)
   {
     //Display PZEM readings
@@ -408,13 +506,51 @@ void DisplayAndLogTask(void* pvParameters)
     if((millis() - prevLogTime) >= 20000)
     {
       //Get current date and time and concatenate with PZEM readings
-      DateTime dateTime = rtc.now();
-      String sdCardData = String(dateTime.day()) + "/" + String(dateTime.month()) + "/" + 
-                          String(dateTime.year()) + " " + String(dateTime.hour()) + ":" + 
-                          String(dateTime.minute()) + " ---> " + String(pzemVoltage,2) + "V, " + 
-                          String(pzemCurrent,2) + "A, " + String(pzemPower,2) + "W, " + 
-                          String(pzemEnergy,3) + "kWh\n";   
-      SD_AppendFile("/project_file.txt",sdCardData.c_str());
+      dateTime = rtc.now(); 
+                          
+      char dayBuff[3] = {0};
+      char monthBuff[3] = {0};
+      char yearBuff[5] = {0};
+      char hourBuff[3] = {0};
+      char minuteBuff[3] = {0};
+      char voltageBuff[7] = {0};
+      char currentBuff[7] = {0};
+      char powerBuff[11] = {0};
+      char energyBuff[11] = {0};
+      
+      IntegerToString(dateTime.day(),dayBuff);
+      IntegerToString(dateTime.month(),monthBuff);
+      IntegerToString(dateTime.year(),yearBuff);
+      IntegerToString(dateTime.hour(),hourBuff);
+      IntegerToString(dateTime.minute(),minuteBuff);
+      FloatToString(pzemVoltage,voltageBuff,100);
+      FloatToString(pzemCurrent,currentBuff,100);
+      FloatToString(pzemPower,powerBuff,100);
+      FloatToString(pzemEnergy,energyBuff,1000);
+
+      strcat(sdCardData,dayBuff);
+      strcat(sdCardData,"/");
+      strcat(sdCardData,monthBuff);
+      strcat(sdCardData,"/");
+      strcat(sdCardData,yearBuff);
+      strcat(sdCardData," ");
+      strcat(sdCardData,hourBuff);
+      strcat(sdCardData,":");
+      strcat(sdCardData,minuteBuff);
+      strcat(sdCardData," ---> ");
+      strcat(sdCardData,voltageBuff);
+      strcat(sdCardData,"V, ");
+      strcat(sdCardData,currentBuff);
+      strcat(sdCardData,"A, ");
+      strcat(sdCardData,powerBuff);
+      strcat(sdCardData,"W, ");
+      strcat(sdCardData,energyBuff);
+      strcat(sdCardData,"kWh\n");
+      
+      SD_AppendFile("/project_file.txt",sdCardData);
+      uint32_t sdCardDataLen = strlen(sdCardData);
+      memset(sdCardData,'\0',sdCardDataLen);
+      
       lcd.clear();
       lcd.print("LOGGING TO SD");
       prevLogTime = millis();

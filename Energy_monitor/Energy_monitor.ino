@@ -154,7 +154,6 @@ static void IntegerToString(uint32_t integer,char* stringPtr)
 
 /**
  * @brief Converts a float to a string.
- * NB: The 'multiplier' parameter expects an argument that is a multiple of 10.
 */
 static void FloatToString(float floatPt,char* stringPtr,uint32_t multiplier)
 {

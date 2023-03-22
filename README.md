@@ -49,10 +49,8 @@ The initial application of this project was transformer monitoring but the requi
 and the system was designed to monitor electrical parameters in a residential building. ``T-Mon``  
 was retained but the current application of the system is ``domestic energy monitoring``.  
  
-## Recommendations  
-1. Add a feature to set energy limits (through a mobile application). If the system's operation does not  
-comply with the limits, a notification should be sent to the user (e.g. through SMS).  
-2. Add a feature to prevent users from removing the SD card each time they need to view their logged data.  
+## Recommendation(s)  
+1. Add a feature to prevent users from removing the SD card each time they need to view their logged data.  
 One way this could be achieved is the use of ``FTP`` for file transfer from the system to a connected device  
 (e.g. a PC) which will run an FTP server software.  
 Another option is to set the system up as a local server that will enable other devices to download the file  

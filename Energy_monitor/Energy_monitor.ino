@@ -11,6 +11,7 @@
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
+#include "numeric_lib.h"
 
 //Maximum number of characters
 #define SIZE_EVENT_NAME        20
@@ -22,6 +23,7 @@
 #define SIZE_CURRENT            7
 #define SIZE_POWER             11
 #define SIZE_ENERGY            11 
+#define SIZE_CLIENT_ID         23
 
 //Shared resources
 WiFiManagerParameter eventName("0","Event name","",SIZE_EVENT_NAME);
@@ -33,6 +35,8 @@ WiFiManagerParameter voltageLimit("5","Voltage limit (V)","",SIZE_VOLTAGE);
 WiFiManagerParameter currentLimit("6","Current limit (A)","",SIZE_CURRENT);
 WiFiManagerParameter powerLimit("7","Power limit (W)","",SIZE_POWER);
 WiFiManagerParameter energyLimit("8","Energy limit (kWh)","",SIZE_ENERGY);
+WiFiManagerParameter subTopic("9","HiveMQ Subscription topic","",SIZE_TOPIC);
+WiFiManagerParameter clientID("A","MQTT client ID","",SIZE_CLIENT_ID);
 Preferences preferences; //for accessing ESP32 flash memory
 
 //Global variables
@@ -131,131 +135,6 @@ static void NotifyUserIfConnIsOk(LiquidCrystal_I2C& lcd,char* server,bool* isSer
   }
 }
 
-/**
- * @brief Converts an integer to a string.
-*/
-static void IntegerToString(uint32_t integer,char* stringPtr)
-{
-  if(integer == 0)
-  {  
-    stringPtr[0] = '0';
-    return;
-  }
-  uint32_t integerCopy = integer;
-  uint8_t numOfDigits = 0;
-
-  while(integerCopy > 0)
-  {
-    integerCopy /= 10;
-    numOfDigits++;
-  }
-  while(integer > 0)
-  {
-    stringPtr[numOfDigits - 1] = '0' + (integer % 10);
-    integer /= 10;
-    numOfDigits--;
-  }
-}
-
-/**
- * @brief Converts a float to a string.
-*/
-static void FloatToString(float floatPt,char* stringPtr,uint32_t multiplier)
-{
-  uint32_t floatAsInt = lround(floatPt * multiplier);
-  char quotientBuff[20] = {0};
-  char remainderBuff[20] = {0};
-  IntegerToString((floatAsInt / multiplier),quotientBuff);
-  IntegerToString((floatAsInt % multiplier),remainderBuff);
-  strcat(stringPtr,quotientBuff);
-  strcat(stringPtr,".");
-  strcat(stringPtr,remainderBuff);
-}
-
-/**
- * @brief Converts a string to an integer.
- * e.g.
- * "932" to 932:
- * '9' - '0' = 9
- * '3' - '0' = 3
- * '2' - '0' = 2
- * 9 x 10^2 + 3 x 10^1 + 2 x 10^0 = 932.
-*/
-static void StringToInteger(char* stringPtr,uint32_t* integerPtr)
-{
-  *integerPtr = 0;
-  uint8_t len = strlen(stringPtr);
-  uint32_t j = 1;
-  for(uint8_t i = 0; i < len; i++)
-  {
-    *integerPtr += ((stringPtr[len - i - 1] - '0') * j);
-    j *= 10;
-  }
-}
-
-/**
- * @brief Converts a string to a float
-*/
-static void StringToFloat(char* stringPtr,float* floatPtr)
-{
-  uint8_t decimalPointIndex = 255; //Invalid index
-  uint8_t len = strlen(stringPtr);
-  
-  for(uint8_t i = 0; i < len; i++)
-  {
-    if(stringPtr[i] == '.')
-    {
-      decimalPointIndex = i;
-      break;
-    }
-  }
-  if(decimalPointIndex == 255)
-  {
-    uint32_t integer = 0;
-    StringToInteger(stringPtr,&integer);
-    *floatPtr = (float)integer;
-  }
-  else
-  {
-    char quotientBuff[20] = {0};
-    char remainderBuff[20] = {0};
-    uint32_t quotient = 0;
-    uint32_t remainder = 0;
-    uint32_t multiplier = 1;
-    uint8_t multiplierLen = len - 1 - decimalPointIndex;
-
-    for(uint8_t i = 0; i < multiplierLen; i++)
-    {
-      multiplier *= 10;
-    }
-    for(uint8_t i = 0; i < decimalPointIndex; i++)
-    {
-      quotientBuff[i] = stringPtr[i];
-    }
-    for(uint8_t i = decimalPointIndex + 1; i < len; i++)
-    {
-      remainderBuff[i - decimalPointIndex - 1] = stringPtr[i];
-    }
-
-    StringToInteger(quotientBuff,&quotient);
-    StringToInteger(remainderBuff,&remainder);
-    uint32_t floatAsInt = ((quotient * multiplier) + remainder);
-    *floatPtr = (float)floatAsInt / multiplier;
-  }
-}
-
-
-/**
- * @brief Set float to zero if it is not a number.
-*/
-static void SetToZeroIfNaN(float* floatPtr)
-{
-  if(isnan(*floatPtr))
-  {
-    *floatPtr = 0.0;
-  }
-}
-
 void setup() 
 {
   setCpuFrequencyMhz(80);
@@ -291,6 +170,8 @@ void WiFiManagementTask(void* pvParameters)
   wm.addParameter(&powerLimit);
   wm.addParameter(&energyLimit);    
   wm.addParameter(&pubTopic);
+  wm.addParameter(&subTopic);
+  wm.addParameter(&clientID);
   wm.setConfigPortalBlocking(false);
   wm.setSaveParamsCallback(WiFiManagerCallback);   
   //Auto-connect to previous network if available.
@@ -440,10 +321,10 @@ void ApplicationTask(void* pvParameters)
       char powerBuff[SIZE_POWER] = {0};
       char energyBuff[SIZE_ENERGY] = {0};
       
-      FloatToString(pzemVoltage,voltageBuff,100);
-      FloatToString(pzemCurrent,currentBuff,100);
-      FloatToString(pzemPower,powerBuff,100);
-      FloatToString(pzemEnergy,energyBuff,1000);
+      FloatToString(pzemVoltage,voltageBuff,2);
+      FloatToString(pzemCurrent,currentBuff,2);
+      FloatToString(pzemPower,powerBuff,2);
+      FloatToString(pzemEnergy,energyBuff,3);
 
       strcat(iftttServerPath,"http://maker.ifttt.com/trigger/");
       strcat(iftttServerPath,prevEventName);
@@ -503,14 +384,12 @@ void DisplayAndLogTask(void* pvParameters)
   digitalWrite(chipSelectPin,HIGH);
   if(SD.begin(chipSelectPin))
   {
-    Serial.println("SD INIT: SUCCESS");
     lcd.print("SD INIT: ");
     lcd.setCursor(0,1);
     lcd.print("SUCCESS");
   }
   else
   {
-    Serial.println("SD INIT: FAILURE");
     lcd.print("SD INIT: ");
     lcd.setCursor(0,1);
     lcd.print("FAILURE");  
@@ -583,10 +462,10 @@ void DisplayAndLogTask(void* pvParameters)
       IntegerToString(dateTime.year(),yearBuff);
       IntegerToString(dateTime.hour(),hourBuff);
       IntegerToString(dateTime.minute(),minuteBuff);
-      FloatToString(pzemVoltage,voltageBuff,100);
-      FloatToString(pzemCurrent,currentBuff,100);
-      FloatToString(pzemPower,powerBuff,100);
-      FloatToString(pzemEnergy,energyBuff,1000);
+      FloatToString(pzemVoltage,voltageBuff,2);
+      FloatToString(pzemCurrent,currentBuff,2);
+      FloatToString(pzemPower,powerBuff,2);
+      FloatToString(pzemEnergy,energyBuff,3);
 
       strcat(sdCardData,dayBuff);
       strcat(sdCardData,"/");
@@ -638,11 +517,12 @@ void MqttTask(void* pvParameters)
 {
   static WiFiClient wifiClient;
   static PubSubClient mqttClient(wifiClient);
-  static char dataToPublish[600];
+  static char dataToPublish[250];
   
   char prevPubTopic[SIZE_TOPIC] = {0};
+  char prevSubTopic[SIZE_TOPIC] = {0};
+  char prevClientID[SIZE_CLIENT_ID] = {0};
   const char *mqttBroker = "broker.hivemq.com";
-  const char* brokerSubTopic = "Limits";
   const uint16_t mqttPort = 1883;  
   uint32_t prevTime = millis();
             
@@ -652,15 +532,17 @@ void MqttTask(void* pvParameters)
     {       
       if(!mqttClient.connected())
       {
+        memset(prevPubTopic,'\0',SIZE_TOPIC);
+        memset(prevSubTopic,'\0',SIZE_TOPIC);
+        memset(prevClientID,'\0',SIZE_CLIENT_ID);
         preferences.getBytes("4",prevPubTopic,SIZE_TOPIC);  
+        preferences.getBytes("9",prevSubTopic,SIZE_TOPIC);  
+        preferences.getBytes("A",prevClientID,SIZE_CLIENT_ID);  
         mqttClient.setServer(mqttBroker,mqttPort);
         mqttClient.setCallback(MqttCallback);
         while(!mqttClient.connected())
         {
-          String clientID = String(WiFi.macAddress());
-          Serial.print("MAC address = ");
-          Serial.println(clientID.c_str());
-          if(mqttClient.connect(clientID.c_str()))
+          if(mqttClient.connect(prevClientID))
           {
             Serial.println("Connected to HiveMQ broker");
             mqttClient.subscribe(prevPubTopic);
@@ -669,7 +551,7 @@ void MqttTask(void* pvParameters)
       }
       else
       {
-        if((millis() - prevTime) >= 1000)
+        if((millis() - prevTime) >= 500)
         {
           char prevVoltageLimit[SIZE_VOLTAGE] = {0};
           char prevCurrentLimit[SIZE_CURRENT] = {0};
@@ -681,7 +563,7 @@ void MqttTask(void* pvParameters)
           preferences.getBytes("7",prevPowerLimit,SIZE_POWER);
           preferences.getBytes("8",prevEnergyLimit,SIZE_ENERGY); 
         
-          strcat(dataToPublish,"LIMITS: ");
+          strcat(dataToPublish,"Limits: ");
           strcat(dataToPublish,prevVoltageLimit);
           strcat(dataToPublish,"V\n");
           strcat(dataToPublish,prevCurrentLimit);
@@ -689,7 +571,7 @@ void MqttTask(void* pvParameters)
           strcat(dataToPublish,prevPowerLimit);
           strcat(dataToPublish,"W\n"); 
           strcat(dataToPublish,prevEnergyLimit);
-          strcat(dataToPublish,"kWh\n\n"); 
+          strcat(dataToPublish,"kWh\n"); 
 
           float voltageLim = 0;
           float currentLim = 0;
@@ -705,43 +587,40 @@ void MqttTask(void* pvParameters)
           bool isCurrentAbnormal = lround(pzemCurrent * 100) > lround(currentLim * 100);
           bool isPowerAbnormal = lround(pzemPower * 100) > lround(powerLim * 100);
           bool isEnergyAbnormal = lround(pzemEnergy * 1000) > lround(energyLim * 1000);
-          
+
+          strcat(dataToPublish,"Abnormal readings: ");
           if(isVoltageAbnormal)
           {
             char voltageBuff[SIZE_VOLTAGE] = {0};
-            FloatToString(pzemVoltage,voltageBuff,100);
-            strcat(dataToPublish,"Voltage: ");
+            FloatToString(pzemVoltage,voltageBuff,2);
             strcat(dataToPublish,voltageBuff);
-            strcat(dataToPublish,"V (LIMIT EXCEEDED!!!)\n");
+            strcat(dataToPublish,"V\n");
           }
           if(isCurrentAbnormal)
           {
             char currentBuff[SIZE_CURRENT] = {0};
-            FloatToString(pzemCurrent,currentBuff,100);
-            strcat(dataToPublish,"Current: ");
+            FloatToString(pzemCurrent,currentBuff,2);
             strcat(dataToPublish,currentBuff);
-            strcat(dataToPublish,"A (LIMIT EXCEEDED!!!)\n");
+            strcat(dataToPublish,"A\n");
           }
           if(isPowerAbnormal)
           {
             char powerBuff[SIZE_POWER] = {0};
-            FloatToString(pzemPower,powerBuff,100);
-            strcat(dataToPublish,"Power: ");
+            FloatToString(pzemPower,powerBuff,2);
             strcat(dataToPublish,powerBuff);
-            strcat(dataToPublish,"W (LIMIT EXCEEDED!!!)\n");
+            strcat(dataToPublish,"W\n");
           }
           if(isEnergyAbnormal)
           {
             char energyBuff[SIZE_ENERGY] = {0};
-            FloatToString(pzemEnergy,energyBuff,1000);
-            strcat(dataToPublish,"Energy: ");
+            FloatToString(pzemEnergy,energyBuff,3);
             strcat(dataToPublish,energyBuff);
-            strcat(dataToPublish,"kWh (LIMIT EXCEEDED!!!)\n");
+            strcat(dataToPublish,"kWh\n");
           }
 
           if(isVoltageAbnormal || isCurrentAbnormal || isPowerAbnormal || isEnergyAbnormal)
           {
-            mqttClient.publish(brokerSubTopic,dataToPublish); 
+            mqttClient.publish(prevSubTopic,dataToPublish); 
           }
           memset(dataToPublish,'\0',strlen(dataToPublish));
           prevTime = millis();
@@ -768,6 +647,8 @@ void WiFiManagerCallback(void)
   char prevCurrentLimit[SIZE_CURRENT] = {0};
   char prevPowerLimit[SIZE_POWER] = {0};
   char prevEnergyLimit[SIZE_ENERGY] = {0};
+  char prevSubTopic[SIZE_TOPIC] = {0};
+  char prevClientID[SIZE_CLIENT_ID] = {0};
   //Get previously stored data  
   preferences.getBytes("0",prevEventName,SIZE_EVENT_NAME);
   preferences.getBytes("1",prevIftttKey,SIZE_IFTTT_KEY);  
@@ -778,6 +659,8 @@ void WiFiManagerCallback(void)
   preferences.getBytes("6",prevCurrentLimit,SIZE_CURRENT);
   preferences.getBytes("7",prevPowerLimit,SIZE_POWER);
   preferences.getBytes("8",prevEnergyLimit,SIZE_ENERGY);
+  preferences.getBytes("9",prevSubTopic,SIZE_TOPIC); 
+  preferences.getBytes("A",prevClientID,SIZE_CLIENT_ID); 
   //Store data in flash if the new ones are not the same as the old.  
   StoreNewFlashData("0",eventName.getValue(),prevEventName,SIZE_EVENT_NAME);
   StoreNewFlashData("1",iftttKey.getValue(),prevIftttKey,SIZE_IFTTT_KEY);
@@ -788,6 +671,8 @@ void WiFiManagerCallback(void)
   StoreNewFlashData("6",currentLimit.getValue(),prevCurrentLimit,SIZE_CURRENT);
   StoreNewFlashData("7",powerLimit.getValue(),prevPowerLimit,SIZE_POWER);
   StoreNewFlashData("8",energyLimit.getValue(),prevEnergyLimit,SIZE_ENERGY);
+  StoreNewFlashData("9",subTopic.getValue(),prevSubTopic,SIZE_TOPIC);
+  StoreNewFlashData("A",clientID.getValue(),prevClientID,SIZE_CLIENT_ID);
 }
 
 /**

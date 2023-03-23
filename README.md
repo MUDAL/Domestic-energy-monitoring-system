@@ -40,6 +40,7 @@ as well as data logging to an SD card and data upload to the ThingSpeak server a
 ## Credits  
 1. https://randomnerdtutorials.com/esp32-esp8266-publish-sensor-readings-to-google-sheets/  
 2. https://github.com/stechiez/iot_projects/blob/master/GoogleSpreadSheet_ESP32_IFTTT/ESP32_GoogleSpreadSheetIFTTT/ESP32_GoogleSpreadSheetIFTTT.ino  
+3. PZEM-004T sample code and connections: https://www.nn-digital.com/en/blog/2019/11/04/example-of-the-pzem-004t-v3-v3-0-interfacing-program-using-arduino/  
 
 ## Note(s)  
 1. ``preferences.begin("T-Mon",false);``. I observed that a short string as the first argument    

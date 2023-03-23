@@ -35,6 +35,7 @@ as well as data logging to an SD card and data upload to the ThingSpeak server a
 ![20230214_095808](https://user-images.githubusercontent.com/46250887/218693188-4467e4f6-f67c-401f-bfd4-25fa2a50df3e.jpg)
 ![20230214_095804](https://user-images.githubusercontent.com/46250887/218693269-3f58c477-486f-4b24-bbf2-b4b3f9e1f41c.jpg)
 ![20230214_095738](https://user-images.githubusercontent.com/46250887/218693367-19334fc0-fde2-4a42-8139-cdb86ab65094.jpg)     
+![20230214_095745](https://user-images.githubusercontent.com/46250887/227372889-d035e268-7342-4ddf-9302-02d17e1a97ad.jpg)   
 
 ## Credits  
 1. https://randomnerdtutorials.com/esp32-esp8266-publish-sensor-readings-to-google-sheets/  

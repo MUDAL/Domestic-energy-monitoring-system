@@ -11,6 +11,7 @@ points in a building, allowing users to monitor their energy usage in real-time.
 3. Periodic logging of measured data to an SD card.   
 4. Periodic uploading of data to the cloud (ThingSpeak Server and Google Sheets).  
 5. Wi-Fi provisioning.   
+6. Sending of notifications to the user whenever abnormal measurements are detected (i.e. the measured data have exceeded their limits).  
 
 ## Hardware  
 1. ESP32 development board  
@@ -18,8 +19,14 @@ points in a building, allowing users to monitor their energy usage in real-time.
 3. 16x2 LCD   
 4. DS3231 RTC module  
 5. SD card module   
-6. Two Li-ion batteries  
-7. 3-pin plug   
+6. 2GB SD card  
+7. 18650 Li-ion battery (x2)  
+8. 18650 battery holder  
+9. AC power socket
+10. 3-pin AC power plug   
+11. Jumper wires  
+12. LM7805 voltage regulator  
+13. LM2596 buck converter module  
 
 ## Software  
 The system was developed using the ESP-IDF FreeRTOS software platform. The ESP32 was programmed using C++.    

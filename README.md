@@ -20,7 +20,7 @@ points in a building, allowing users to monitor their energy usage in real-time.
 4. DS3231 RTC module  
 5. SD card module   
 6. 2GB SD card  
-7. 18650 Li-ion battery (x2)  
+7. Two 18650 Li-ion batteries   
 8. 18650 battery holder  
 9. AC power socket
 10. 3-pin AC power plug   

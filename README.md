@@ -11,7 +11,7 @@ points in a building, allowing users to monitor their energy usage in real-time.
 3. Periodic logging of measured data to an SD card.   
 4. Periodic uploading of data to the cloud (ThingSpeak Server and Google Sheets).  
 5. Wi-Fi provisioning.   
-6. Sending of notifications to the user whenever abnormal measurements are detected (i.e. the measured data have exceeded their limits).  
+6. Sending of notifications to the user whenever the measured parameters exceed their limits.    
 
 ## Hardware  
 1. ESP32 development board  

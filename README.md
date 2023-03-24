@@ -27,6 +27,7 @@ points in a building, allowing users to monitor their energy usage in real-time.
 11. Jumper wires  
 12. LM7805 voltage regulator  
 13. LM2596 buck converter module  
+14. Logic level shifter  
 
 ## Software  
 The system was developed using the ESP-IDF FreeRTOS software platform. The ESP32 was programmed using C++.    

@@ -10,8 +10,9 @@ points in a building, allowing users to monitor their energy usage in real-time.
 2. Periodic display of measured data on an LCD.   
 3. Periodic logging of measured data to an SD card.   
 4. Periodic uploading of data to the cloud (ThingSpeak Server and Google Sheets).  
-5. Wi-Fi provisioning.   
-6. Sending of notifications to the user whenever the measured parameters exceed their limits.    
+5. Wi-Fi provisioning: To configure the SSID and password of the Wi-Fi network required by the system via a captive portal.   
+The captive portal can also be used to configure limits for voltage, current, power, and energy.    
+6. Sending of notifications to the user (via an MQTT mobile application) whenever the measured parameters exceed their limits.    
 
 ## Hardware  
 1. ESP32 development board  

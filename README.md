@@ -29,11 +29,21 @@ The captive portal can also be used to configure limits for voltage, current, po
 12. LM7805 voltage regulator  
 13. LM2596 buck converter module  
 14. Logic level shifter  
+15. SPDT switch
 
 ## Software  
 The system was developed using the ESP-IDF FreeRTOS software platform. The ESP32 was programmed using C++.    
 The code provides real-time measurement and display of current, voltage, power, and energy consumption,  
 as well as data logging to an SD card and data upload to the ThingSpeak server and Google Sheets.  
+
+The software tools used in this project include:
+1. Arduino IDE  
+2. ESP-IDF FreeRTOS: To execute different tasks concurrently  
+3. ThingSpeak: To visualize data  
+4. IFTTT: To upload data to GoogSheets   
+5. MQTT Dashboard: A mobile app to notify the user when energy limits have been exceeded.    
+The smart energy monitor sends notifications to an MQTT broker (HiveMQ was used).    
+The MQTT dashboard receives these notifications from the broker and alerts the user.    
 
 ## Software architecture  
 ![ss_sl drawio](https://user-images.githubusercontent.com/46250887/224770270-1bf60a7b-530a-4b28-9697-761c83392917.png)  

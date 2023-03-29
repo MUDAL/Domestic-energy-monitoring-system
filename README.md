@@ -6,11 +6,13 @@ The system is designed to measure and display current, voltage, power, and energ
 points in a building, allowing users to monitor their energy usage in real-time.   
 
 ## Features   
-1. Measurement of current, voltage, power, and energy consumed in a building.   
-2. Periodic display of measured data on an LCD.   
-3. Periodic logging of measured data to an SD card.   
-4. Periodic uploading of data to the cloud (ThingSpeak Server and Google Sheets).  
-5. Wi-Fi provisioning.   
+1. Measurement of current, voltage, power, and energy consumed in a building.
+2. Periodic display of measured data on an LCD.
+3. Periodic logging of measured data to an SD card.
+4. Periodic data upload to the cloud (ThingSpeak Server and Google Sheets).
+5. Wi-Fi provisioning: To configure the SSID and password of the Wi-Fi network required by the system via a captive portal.
+The captive portal also configures voltage, current, power, and energy limits.
+6. The device sends notifications to the user (via an MQTT mobile application) whenever the measured parameters exceed their limits.    
 
 ## Hardware  
 1. ESP32 development board  
@@ -18,13 +20,30 @@ points in a building, allowing users to monitor their energy usage in real-time.
 3. 16x2 LCD   
 4. DS3231 RTC module  
 5. SD card module   
-6. Two Li-ion batteries  
-7. 3-pin plug   
+6. 2GB SD card  
+7. Two 18650 Li-ion batteries   
+8. 18650 battery holder  
+9. AC power socket
+10. 3-pin AC power plug   
+11. Jumper wires  
+12. LM7805 voltage regulator  
+13. LM2596 buck converter module  
+14. Logic level shifter  
+15. SPDT switch
 
 ## Software  
 The system was developed using the ESP-IDF FreeRTOS software platform. The ESP32 was programmed using C++.    
 The code provides real-time measurement and display of current, voltage, power, and energy consumption,  
 as well as data logging to an SD card and data upload to the ThingSpeak server and Google Sheets.  
+
+The software tools used in this project include:
+1. Arduino IDE  
+2. ESP-IDF FreeRTOS: To execute different tasks concurrently  
+3. ThingSpeak: To visualize data  
+4. IFTTT: To upload data to GoogSheets   
+5. MQTT Dashboard: A mobile app to notify the user when energy limits have been exceeded.    
+The smart energy monitor sends notifications to an MQTT broker (HiveMQ was used).    
+The MQTT dashboard receives these notifications from the broker and alerts the user.    
 
 ## Software architecture  
 ![ss_sl drawio](https://user-images.githubusercontent.com/46250887/224770270-1bf60a7b-530a-4b28-9697-761c83392917.png)  
@@ -34,14 +53,15 @@ as well as data logging to an SD card and data upload to the ThingSpeak server a
 ![20230314_154655](https://user-images.githubusercontent.com/46250887/225056379-8224e1f4-f767-416e-ba46-11a14c7af4e9.jpg)  
 ![20230214_095808](https://user-images.githubusercontent.com/46250887/218693188-4467e4f6-f67c-401f-bfd4-25fa2a50df3e.jpg)
 ![20230214_095804](https://user-images.githubusercontent.com/46250887/218693269-3f58c477-486f-4b24-bbf2-b4b3f9e1f41c.jpg)
-![20230214_095738](https://user-images.githubusercontent.com/46250887/218693367-19334fc0-fde2-4a42-8139-cdb86ab65094.jpg)
-![20230208_085155](https://user-images.githubusercontent.com/46250887/217480209-509b88e5-f881-40e4-9713-366d0af42f70.jpg)       
+![20230214_095738](https://user-images.githubusercontent.com/46250887/218693367-19334fc0-fde2-4a42-8139-cdb86ab65094.jpg)     
+![20230214_095745](https://user-images.githubusercontent.com/46250887/227372889-d035e268-7342-4ddf-9302-02d17e1a97ad.jpg)   
 
 ## Credits  
 1. https://randomnerdtutorials.com/esp32-esp8266-publish-sensor-readings-to-google-sheets/  
 2. https://github.com/stechiez/iot_projects/blob/master/GoogleSpreadSheet_ESP32_IFTTT/ESP32_GoogleSpreadSheetIFTTT/ESP32_GoogleSpreadSheetIFTTT.ino  
+3. PZEM-004T sample code and connections: https://www.nn-digital.com/en/blog/2019/11/04/example-of-the-pzem-004t-v3-v3-0-interfacing-program-using-arduino/  
 
-## Notes(s)  
+## Note(s)  
 1. ``preferences.begin("T-Mon",false);``. I observed that a short string as the first argument    
 of ``begin`` method helps in avoiding some issues with accessing the flash memory via the   
 ``Preferences`` library. ``T-Mon`` was used as a short form for ``Transformer-monitor``.  

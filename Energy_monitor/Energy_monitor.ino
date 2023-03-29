@@ -563,7 +563,7 @@ void MqttTask(void* pvParameters)
           preferences.getBytes("7",prevPowerLimit,SIZE_POWER);
           preferences.getBytes("8",prevEnergyLimit,SIZE_ENERGY); 
         
-          strcat(dataToPublish,"Limits: ");
+          strcat(dataToPublish,"Limits:\n");
           strcat(dataToPublish,prevVoltageLimit);
           strcat(dataToPublish,"V\n");
           strcat(dataToPublish,prevCurrentLimit);
@@ -571,7 +571,7 @@ void MqttTask(void* pvParameters)
           strcat(dataToPublish,prevPowerLimit);
           strcat(dataToPublish,"W\n"); 
           strcat(dataToPublish,prevEnergyLimit);
-          strcat(dataToPublish,"kWh\n"); 
+          strcat(dataToPublish,"kWh\n\n"); 
 
           float voltageLim = 0;
           float currentLim = 0;
@@ -588,7 +588,7 @@ void MqttTask(void* pvParameters)
           bool isPowerAbnormal = lround(pzemPower * 100) > lround(powerLim * 100);
           bool isEnergyAbnormal = lround(pzemEnergy * 1000) > lround(energyLim * 1000);
 
-          strcat(dataToPublish,"Abnormal readings: ");
+          strcat(dataToPublish,"Abnormal:\n");
           if(isVoltageAbnormal)
           {
             char voltageBuff[SIZE_VOLTAGE] = {0};

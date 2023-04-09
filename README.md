@@ -21,8 +21,8 @@ The captive portal also configures voltage, current, power, and energy limits.
 4. DS3231 RTC module  
 5. SD card module   
 6. 2GB SD card  
-7. Two 18650 Li-ion batteries   
-8. 18650 battery holder  
+7. Two 18650 Li-ion batteries (deprecated)   
+8. 18650 battery holder (deprecated)  
 9. AC power socket
 10. 3-pin AC power plug   
 11. Jumper wires  
@@ -30,6 +30,7 @@ The captive portal also configures voltage, current, power, and energy limits.
 13. LM2596 buck converter module  
 14. Logic level shifter  
 15. SPDT switch
+16. 9V AC adapter (replacement for the batteries)   
 
 ## Software  
 The system was developed using the ESP-IDF FreeRTOS software platform. The ESP32 was programmed using C++.    
@@ -40,15 +41,19 @@ The software tools used in this project include:
 1. Arduino IDE  
 2. ESP-IDF FreeRTOS: To execute different tasks concurrently  
 3. ThingSpeak: To visualize data  
-4. IFTTT: To upload data to GoogSheets   
-5. MQTT Dashboard: A mobile app to notify the user when energy limits have been exceeded.    
+4. IFTTT: To upload data to Google Sheets   
+5. MQTT Alert: A mobile app to notify the user when energy limits have been exceeded.    
 The smart energy monitor sends notifications to an MQTT broker (HiveMQ was used).    
-The MQTT dashboard receives these notifications from the broker and alerts the user.    
+The mobile app receives these notifications from the broker and alerts the user.  
+
+Link to download the ``MQTT Alert`` application: https://play.google.com/store/apps/details?id=gigiosoft.MQTTAlert  
 
 ## Software architecture  
 ![ss_sl drawio](https://user-images.githubusercontent.com/46250887/224770270-1bf60a7b-530a-4b28-9697-761c83392917.png)  
 
 ## Images of the prototype   
+![20230408_114308](https://user-images.githubusercontent.com/46250887/230765342-abbd84d1-73c1-4e4b-bb72-1dba89ae5d0e.jpg)  
+![20230408_114346](https://user-images.githubusercontent.com/46250887/230765391-90cf442b-e574-4bad-beec-d75635222341.jpg)  
 ![20230314_154550](https://user-images.githubusercontent.com/46250887/225056313-a61fb779-47ac-4ccb-96ba-5e7eebf49878.jpg)  
 ![20230314_154655](https://user-images.githubusercontent.com/46250887/225056379-8224e1f4-f767-416e-ba46-11a14c7af4e9.jpg)  
 ![20230214_095808](https://user-images.githubusercontent.com/46250887/218693188-4467e4f6-f67c-401f-bfd4-25fa2a50df3e.jpg)
@@ -79,3 +84,4 @@ containing the logged data through a web browser.
 ## Improvements made  
 1. Display of 0 instead of ``NAN`` whenever the system isn't plugged.  
 2. Replacement of code utilizing dynamic memory allocation with code utilizing static memory allocation.  
+3. Replacement of batteries with AC adapters for power supply (final modification).  

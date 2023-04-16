@@ -202,7 +202,7 @@ void WiFiManagementTask(void* pvParameters)
   wm.setSaveParamsCallback(WiFiManagerCallback);   
   //Auto-connect to previous network if available.
   //If connection fails, ESP32 goes from being a station to being an access point.
-  Serial.print(wm.autoConnect("TRANSFORMER")); 
+  Serial.print(wm.autoConnect("E-MONITOR")); 
   Serial.println("-->WiFi status");   
   bool accessPointMode = false;
   uint32_t startTime = 0;    
@@ -216,7 +216,7 @@ void WiFiManagementTask(void* pvParameters)
       {
         if(!wm.getConfigPortalActive())
         {
-          wm.autoConnect("TRANSFORMER"); 
+          wm.autoConnect("E-MONITOR"); 
         }
         accessPointMode = true; 
         startTime = millis(); 
@@ -318,7 +318,10 @@ void ApplicationTask(void* pvParameters)
     
     //Reset the system in case valid readings aren't read from the PZEM module...
     //despite the system's 3-pin plug being connected to an AC source.
-    ResetIfReadingsAreInvalid(15000);
+    if(WiFi.status() == WL_CONNECTED)
+    {
+      ResetIfReadingsAreInvalid(10000);
+    }
     
     //Send data to the cloud [periodically]      
     if(WiFi.status() == WL_CONNECTED && ((millis() - prevConnectTime) >= 20000))

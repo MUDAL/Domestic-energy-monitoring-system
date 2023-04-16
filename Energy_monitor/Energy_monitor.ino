@@ -135,6 +135,32 @@ static void NotifyUserIfConnIsOk(LiquidCrystal_I2C& lcd,char* server,bool* isSer
   }
 }
 
+/**
+ * @brief Reset the system after specified time in milliseconds if the 
+ * readings from the PZEM module are invalid.
+*/
+static void ResetIfReadingsAreInvalid(uint32_t timeMillis)
+{
+  static bool prevInvalid;
+  static uint32_t prevTime;
+  bool isInvalid = (lround(pzemVoltage) == 0) && (lround(pzemCurrent) == 0) &&
+                   (lround(pzemPower) == 0) && (lround(pzemEnergy) == 0);
+  
+  if(isInvalid && !prevInvalid)
+  {
+    Serial.println("Invalid readings, system will reset soon");
+    prevInvalid = true;
+    prevTime = millis();
+  }
+  if(prevInvalid && ((millis() - prevTime) >= timeMillis))
+  {
+    prevTime = millis();
+    prevInvalid = false;
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_restart();    
+  }
+}
+
 void setup() 
 {
   setCpuFrequencyMhz(80);
@@ -268,7 +294,7 @@ void ApplicationTask(void* pvParameters)
     }
     
     //Critical section [Get data from PZEM module periodically]
-    if((millis() - prevPzemTime) >= 1000)
+    if((millis() - prevPzemTime) >= 2500)
     {
       SuspendWiFiTask();
       vTaskSuspend(mqttTaskHandle);
@@ -289,6 +315,10 @@ void ApplicationTask(void* pvParameters)
       vTaskResume(dispLogTaskHandle);
       prevPzemTime = millis();
     }
+    
+    //Reset the system in case valid readings aren't read from the PZEM module...
+    //despite the system's 3-pin plug being connected to an AC source.
+    ResetIfReadingsAreInvalid(15000);
     
     //Send data to the cloud [periodically]      
     if(WiFi.status() == WL_CONNECTED && ((millis() - prevConnectTime) >= 20000))

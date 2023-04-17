@@ -135,6 +135,33 @@ static void NotifyUserIfConnIsOk(LiquidCrystal_I2C& lcd,char* server,bool* isSer
   }
 }
 
+/**
+ * @brief Reset the system after specified time in milliseconds if the 
+ * readings from the PZEM module are invalid.
+*/
+static void ResetIfReadingsAreInvalid(uint32_t timeMillis)
+{
+  static bool prevInvalid;
+  static uint32_t prevTime;
+  bool isInvalid = (lround(pzemVoltage) == 0) && (lround(pzemCurrent) == 0) &&
+                   (lround(pzemPower) == 0) && (lround(pzemEnergy) == 0);
+  
+  if(isInvalid && !prevInvalid)
+  {
+    Serial.println("Invalid readings, system will reset soon");
+    prevInvalid = true;
+    prevTime = millis();
+  }
+  if(prevInvalid && ((millis() - prevTime) >= timeMillis))
+  {
+    if(isInvalid)
+    {
+      esp_restart();
+    }
+    prevInvalid = false;    
+  }
+}
+
 void setup() 
 {
   setCpuFrequencyMhz(80);
@@ -176,7 +203,7 @@ void WiFiManagementTask(void* pvParameters)
   wm.setSaveParamsCallback(WiFiManagerCallback);   
   //Auto-connect to previous network if available.
   //If connection fails, ESP32 goes from being a station to being an access point.
-  Serial.print(wm.autoConnect("TRANSFORMER")); 
+  Serial.print(wm.autoConnect("Energy-Monitor")); 
   Serial.println("-->WiFi status");   
   bool accessPointMode = false;
   uint32_t startTime = 0;    
@@ -190,7 +217,7 @@ void WiFiManagementTask(void* pvParameters)
       {
         if(!wm.getConfigPortalActive())
         {
-          wm.autoConnect("TRANSFORMER"); 
+          wm.autoConnect("Energy-Monitor"); 
         }
         accessPointMode = true; 
         startTime = millis(); 
@@ -239,7 +266,7 @@ void ApplicationTask(void* pvParameters)
   char prevIftttKey[SIZE_IFTTT_KEY] = {0};
   char prevChannelId[SIZE_CHANNEL_ID] = {0};
   char prevApiKey[SIZE_API_KEY] = {0};
-  
+
   uint32_t prevPzemTime = millis();  
   uint32_t prevConnectTime = millis();
  
@@ -267,8 +294,9 @@ void ApplicationTask(void* pvParameters)
       resetEnergyCounter = 0;
     }
     
+    bool hasPzemBeenRead = false;
     //Critical section [Get data from PZEM module periodically]
-    if((millis() - prevPzemTime) >= 1000)
+    if((millis() - prevPzemTime) >= 2500)
     {
       SuspendWiFiTask();
       vTaskSuspend(mqttTaskHandle);
@@ -288,6 +316,14 @@ void ApplicationTask(void* pvParameters)
       vTaskResume(mqttTaskHandle);
       vTaskResume(dispLogTaskHandle);
       prevPzemTime = millis();
+      hasPzemBeenRead = true;
+    }
+    
+    //Reset the system in case valid readings aren't read from the PZEM module...
+    //despite the system's 3-pin plug being connected to an AC source.
+    if(WiFi.status() == WL_CONNECTED && hasPzemBeenRead)
+    {
+      ResetIfReadingsAreInvalid(10000);
     }
     
     //Send data to the cloud [periodically]      

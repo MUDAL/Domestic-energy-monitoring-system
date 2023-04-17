@@ -154,10 +154,11 @@ static void ResetIfReadingsAreInvalid(uint32_t timeMillis)
   }
   if(prevInvalid && ((millis() - prevTime) >= timeMillis))
   {
-    prevTime = millis();
-    prevInvalid = false;
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    esp_restart();    
+    if(isInvalid)
+    {
+      esp_restart();
+    }
+    prevInvalid = false;    
   }
 }
 
@@ -202,7 +203,7 @@ void WiFiManagementTask(void* pvParameters)
   wm.setSaveParamsCallback(WiFiManagerCallback);   
   //Auto-connect to previous network if available.
   //If connection fails, ESP32 goes from being a station to being an access point.
-  Serial.print(wm.autoConnect("E-MONITOR")); 
+  Serial.print(wm.autoConnect("Energy-Monitor")); 
   Serial.println("-->WiFi status");   
   bool accessPointMode = false;
   uint32_t startTime = 0;    
@@ -216,7 +217,7 @@ void WiFiManagementTask(void* pvParameters)
       {
         if(!wm.getConfigPortalActive())
         {
-          wm.autoConnect("E-MONITOR"); 
+          wm.autoConnect("Energy-Monitor"); 
         }
         accessPointMode = true; 
         startTime = millis(); 
@@ -265,7 +266,7 @@ void ApplicationTask(void* pvParameters)
   char prevIftttKey[SIZE_IFTTT_KEY] = {0};
   char prevChannelId[SIZE_CHANNEL_ID] = {0};
   char prevApiKey[SIZE_API_KEY] = {0};
-  
+
   uint32_t prevPzemTime = millis();  
   uint32_t prevConnectTime = millis();
  
@@ -293,6 +294,7 @@ void ApplicationTask(void* pvParameters)
       resetEnergyCounter = 0;
     }
     
+    bool hasPzemBeenRead = false;
     //Critical section [Get data from PZEM module periodically]
     if((millis() - prevPzemTime) >= 2500)
     {
@@ -314,11 +316,12 @@ void ApplicationTask(void* pvParameters)
       vTaskResume(mqttTaskHandle);
       vTaskResume(dispLogTaskHandle);
       prevPzemTime = millis();
+      hasPzemBeenRead = true;
     }
     
     //Reset the system in case valid readings aren't read from the PZEM module...
     //despite the system's 3-pin plug being connected to an AC source.
-    if(WiFi.status() == WL_CONNECTED)
+    if(WiFi.status() == WL_CONNECTED && hasPzemBeenRead)
     {
       ResetIfReadingsAreInvalid(10000);
     }

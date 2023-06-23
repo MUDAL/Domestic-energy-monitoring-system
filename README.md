@@ -54,6 +54,7 @@ Link to download the ``MQTT Alert`` application: https://play.google.com/store/a
 ## Images of the prototype   
 ![20230623_193620](https://github.com/MUDAL/Domestic-energy-monitoring-system/assets/46250887/d942988b-29da-4e9d-bdbf-2139b8d0b342)
 ![Screenshot (380)](https://github.com/MUDAL/Domestic-energy-monitoring-system/assets/46250887/c881b5d6-91a8-4877-9cd6-7a5c536c39aa)
+![Screenshot (382)](https://github.com/MUDAL/Domestic-energy-monitoring-system/assets/46250887/8b9c3171-f767-42b2-917e-9f816123e2fd)  
 ![Screenshot (378)](https://github.com/MUDAL/Domestic-energy-monitoring-system/assets/46250887/e676d6f2-1338-433c-b834-7ae8c36190cf)  
 ![20230408_114308](https://user-images.githubusercontent.com/46250887/230765342-abbd84d1-73c1-4e4b-bb72-1dba89ae5d0e.jpg)  
 ![20230408_114346](https://user-images.githubusercontent.com/46250887/230765391-90cf442b-e574-4bad-beec-d75635222341.jpg)  

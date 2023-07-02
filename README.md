@@ -8,7 +8,7 @@ points in a building, allowing users to monitor their energy usage in real-time.
 ## Features   
 1. Measurement of current, voltage, power, and energy consumed in a building.
 2. Periodic display of measured data on an LCD.
-3. Periodic logging of measured data to an SD card.
+3. Periodic logging of measured data on an SD card.
 4. Periodic data upload to the cloud (ThingSpeak Server and Google Sheets).
 5. Wi-Fi provisioning: To configure the SSID and password of the Wi-Fi network required by the system via a captive portal.
 The captive portal also configures voltage, current, power, and energy limits.

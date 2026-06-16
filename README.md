@@ -21,16 +21,14 @@ The captive portal also configures voltage, current, power, and energy limits.
 4. DS3231 RTC module  
 5. SD card module   
 6. 2GB SD card  
-7. Two 18650 Li-ion batteries (deprecated)   
-8. 18650 battery holder (deprecated)  
-9. AC power socket
-10. 3-pin AC power plug   
-11. Jumper wires  
-12. LM7805 voltage regulator  
-13. LM2596 buck converter module  
-14. Logic level shifter  
-15. SPDT switch
-16. 9V AC adapter (replacement for the batteries)   
+7. AC power socket
+8. 3-pin AC power plug   
+9. Jumper wires  
+10. LM7805 voltage regulator  
+11. LM2596 buck converter module  
+12. Logic level shifter  
+13. SPDT switch
+14. 9V AC adapter   
 
 ## Software  
 The system was developed using the ESP-IDF FreeRTOS software platform. The ESP32 was programmed using C++.    

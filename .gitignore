@@ -1,0 +1,18 @@
+# Kicad artefacts
+*backups
+**/*.net
+**/_autosave-*
+**/*.bak
+**/*.bck
+**/*.kicad_sch-bak
+**/*.kicad_pcb-bak
+**/*.lck
+**/fp-info-cache
+**/*.kicad_prl
+
+# Useless extension (WSL)
+*Zone.identifier
+
+# Other files/directories
+Deprecated/
+

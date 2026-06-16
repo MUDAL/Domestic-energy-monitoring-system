@@ -1,3 +1,5 @@
+// Author: Olaoluwa Raji
+
 #include <Arduino.h>
 #include "numeric_lib.h"
 

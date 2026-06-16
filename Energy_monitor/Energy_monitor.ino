@@ -1,3 +1,5 @@
+// Author: Olaoluwa Raji
+
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <Preferences.h>

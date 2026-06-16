@@ -49,7 +49,16 @@ The mobile app receives these notifications from the broker and alerts the user.
 Link to download the ``MQTT Alert`` application: https://play.google.com/store/apps/details?id=gigiosoft.MQTTAlert  
 
 ## Software architecture  
-![ss_sl drawio](https://user-images.githubusercontent.com/46250887/224770270-1bf60a7b-530a-4b28-9697-761c83392917.png)  
+<p align="center">
+    <img width=30% src="https://user-images.githubusercontent.com/46250887/224770270-1bf60a7b-530a-4b28-9697-761c83392917.png">
+</p> 
+
+## Video Demos  
+1. [System Startup](https://drive.google.com/file/d/15rAykP7Cj1u7JRBl1Hu21nxwTJwd_Z20/view?usp=sharing)  
+2. [WiFi Provisioning](https://drive.google.com/file/d/1VSvE99P1S9wBY2bUv_U48mo-3ODMSw2Y/view?usp=sharing)  
+3. [Load Test: Electric Iron](https://drive.google.com/file/d/1FuSU22RljI5VVFWzha-J6OE0soTpG5kJ/view?usp=sharing)  
+4. [Load Test: Light Bulb](https://drive.google.com/file/d/1OdBM0wIGSkZ7wZ5bF1eTk2QWKEQir789/view?usp=sharing)  
+5. [Data Logging](https://drive.google.com/file/d/1yUPShkziFqxqBmcSKSHpU0T5GiAVOwqM/view?usp=sharing)  
 
 ## Images of the prototype   
 ![20230623_193620](https://github.com/MUDAL/Domestic-energy-monitoring-system/assets/46250887/d942988b-29da-4e9d-bdbf-2139b8d0b342)
@@ -61,7 +70,6 @@ Link to download the ``MQTT Alert`` application: https://play.google.com/store/a
 ![20230214_095808](https://user-images.githubusercontent.com/46250887/218693188-4467e4f6-f67c-401f-bfd4-25fa2a50df3e.jpg)
 ![20230214_095804](https://user-images.githubusercontent.com/46250887/218693269-3f58c477-486f-4b24-bbf2-b4b3f9e1f41c.jpg)
 ![20230214_095738](https://user-images.githubusercontent.com/46250887/218693367-19334fc0-fde2-4a42-8139-cdb86ab65094.jpg)     
-![20230214_095745](https://user-images.githubusercontent.com/46250887/227372889-d035e268-7342-4ddf-9302-02d17e1a97ad.jpg)   
 
 ## Credits  
 1. https://randomnerdtutorials.com/esp32-esp8266-publish-sensor-readings-to-google-sheets/  

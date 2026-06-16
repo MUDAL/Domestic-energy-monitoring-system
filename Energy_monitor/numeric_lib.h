@@ -1,3 +1,5 @@
+// Author: Olaoluwa Raji
+
 #pragma once
 
 extern void IntegerToString(uint32_t integer,char* stringPtr);
